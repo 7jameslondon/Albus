@@ -7,6 +7,12 @@ function loadSession(hObject)
     hWaitBar = waitbar(0,'Loading in session...', 'WindowStyle', 'modal');
     load([loadPath loadName]);
     
+    %% Handles changes from old versions
+    if ~isfield(session,'savePath')
+        uiwait(msgbox('What folder should data be saved in?','Save'));
+        session.savePath = uigetdir('Where should the data be saved'); 
+    end
+    
     %% Setup general variables
     setappdata(handles.f,'autoSavePath',session.autoSavePath);
     setappdata(handles.f,'savePath',session.savePath);

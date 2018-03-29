@@ -1,0 +1,39 @@
+Run the program by running the file called “main.m”
+Click “Video Settings”
+Click “Select Video” (the video needs to be a black and white tiff stack)
+The video should have white particles on a black background. Click “Invert” if necessary.
+You can remove the first few frames (if desired) by using the slider labeled “Cutting”.
+Click “Back”.
+
+
+
+
+If you have only one color channel then skip this section.
+If you have multiple channels:
+Click "Register Channels"
+Click "Import new mapping video" (select the current video of the mapping using multi-fluorescent beads.
+The video should have white particles on a black background. Click “Invert” if necessary.
+You can adjust the brightness until you can clearly see the bead in all channels.
+Use the drop down menu called "Number of channels" to select the number of color channels in your video.
+Click "Select Channels"
+A set of colored boxes should have appeared over the video. Drag them over to the corresponding sections of the channels and resize them.
+Click "Done".
+Use the "Selected Intensities" slider until most of the beads are selected in all channels. It is better to get fewer beads then to get too many.
+Click "Register Channels". (This might take a few mins ~1-10mins)
+You should see a image of the channels clearly overlapped.
+Click "Done". (This might take a few mins ~1-10mins)
+
+
+
+
+Click “Select DNA”
+If you would like to detect the DNA using a separate video where the DNA is stained by sytox then use the dropdown menu to select “Import new video”. If you would like to use a time average of the same video then select “Current video”.
+If the video has multiple channels use the drop down menu next to "Channel" to select the channel.
+The video needs to have white DNA on a black background. Click “Invert” in necessary.
+You can time average the video by clicking “Time average”.
+
+The program may be able to automatically detect the DNA. To do this you have three inputs you need to adjust. The first is “Binary threshold”. This is the relative binary threshold used to decide whether an object is bright enough to be considered a DNA. I would keep this fairly close to 0.5 but you should try values as low as .3 to .7. Next is “Minimum DNA length” which is fairly self explanatory. Last is “Minimum eccentricity”, this is a measure how of how circular vs linear the “DNA” can be. This essentially changes whether only objects that are longer then they are tall will be selected. I would put this also at 0.5.  
+Try a set of settings and click “Auto Detect DNA”. The results will never be great but they should give you a good estimate. You can then zoom in to the image using the textbox in the bottom left corner of the image panel that should say some percentage like “100%”.   You can then go through and move the lines to correctly go over the DNA. You can add in DNA manually by clicking “Manually add DNA” then click on the image at one side of a DNA and click again on the other side. You can remove a DNA by right clicking on it and then click "Delete".
+
+Once you are done adding DNA click “Generate DNA”. (This will take a while ~2-10mins)
+You can click through the DNA with the arrows on the left of by using the up and down arrows on your keyboard. The numbers in the table are the length of the DNA. If you want to adjust a DNA just move the line on either of the panels on the right. You can watch the movie by clicking the "Play" button. There are magnification settings in the bottom left of each panel.

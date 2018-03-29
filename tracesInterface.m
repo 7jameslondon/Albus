@@ -219,17 +219,34 @@ function handles = createInterface(handles)
     handles.tra.graphGrid.set('Widths',[30 -4 -1],'Heights',[-1 -1]);
     
     % plots
-    handles.tra.DonorPlot           = plot(handles.tra.DAAxes, 1, '-','color', [0 0.5 0]);
+    handles.tra.DonorPlot           = plot(handles.tra.DAAxes, 1, '-');
     hold(handles.tra.DAAxes,'on');
-    handles.tra.AcceptorPlot        = plot(handles.tra.DAAxes, 1, '-','color', [1 0 0]);
-    handles.tra.DonorStatePlot      = plot(handles.tra.DAAxes, 1, '-', 'color', [1 1 1]);
-    handles.tra.AcceptorStatePlot 	= plot(handles.tra.DAAxes, 1, '-', 'color', [1 1 1]);
+    handles.tra.AcceptorPlot        = plot(handles.tra.DAAxes, 1, '-');
+    handles.tra.DonorStatePlot      = plot(handles.tra.DAAxes, 1, '-');
+    handles.tra.AcceptorStatePlot 	= plot(handles.tra.DAAxes, 1, '-', 'color', [0 0 0]);
     hold(handles.tra.DAAxes,'off');
+    
+    handles.tra.DonorPlot.LineWidth         = 2;
+    handles.tra.AcceptorPlot.LineWidth      = 2;
+    handles.tra.DonorStatePlot.LineWidth    = 1;
+    handles.tra.AcceptorStatePlot.LineWidth = 1;
+    
+    handles.tra.DonorPlot.Color         = [38.8, 58.4, 00.0]/100;
+    handles.tra.AcceptorPlot.Color      = [85.5, 13.7, 13.7]/100;
+    handles.tra.DonorStatePlot.Color    = [58.8, 88.4, 30.0]/100;
+    handles.tra.AcceptorStatePlot.Color = [100., 13.7, 40.0]/100;
+
     % fret
-    handles.tra.FRETPlot        = plot(handles.tra.FRETAxes, 1, '-','color', [42 167 201]/512);
+    handles.tra.FRETPlot        = plot(handles.tra.FRETAxes, 1, '-');
     hold(handles.tra.FRETAxes,'on');
     handles.tra.FRETStatePlot   = plot(handles.tra.FRETAxes, 1, '-','color', [0 0 0]/256);
     hold(handles.tra.FRETAxes,'off');
+    
+    handles.tra.FRETPlot.LineWidth      = 2;
+    handles.tra.FRETStatePlot.LineWidth = 1;
+    
+    handles.tra.FRETPlot.Color      = [9.8, 54.1, 54.1]/100;
+    handles.tra.FRETStatePlot.Color = [0.0, 00.0, 00.0]/100;
     
     % current frame arrows on traces
     handles.tra.curFrameArrowDA   = text(handles.tra.DAAxes,   1,0,char(8593),'HorizontalAlignment','center','VerticalAlignment','top');
@@ -340,13 +357,13 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         handles.tra.DonorPlot.XData         = x;
         handles.tra.DonorPlot.YData         = traces.Donor(c,x);
         handles.tra.DonorStatePlot.XData    = x;
-        handles.tra.DonorStatePlot.YData    = zeros(size(x,2),1);%traces.Donor_hmm(c,x);
+        handles.tra.DonorStatePlot.YData    = traces.Donor_hmm(c,x);
         
         % Acceptor Trace
         handles.tra.AcceptorPlot.XData      = x;
         handles.tra.AcceptorPlot.YData      = traces.Acceptor(c,x);
         handles.tra.AcceptorStatePlot.XData = x;
-        handles.tra.AcceptorStatePlot.YData = zeros(size(x,2),1);%traces.Acceptor_hmm(c,x);
+        handles.tra.AcceptorStatePlot.YData = traces.Acceptor_hmm(c,x);
 
         % FRET Trace
         handles.tra.FRETPlot.XData          = x;
@@ -562,8 +579,8 @@ function preCalculateAllTraces(hObject, handles)
     scale = handles.tra.DAScale.JavaPeer.get('Value')/handles.tra.DAScale.JavaPeer.get('Maximum')*10;
     scale = 10^-scale;
     numTraces = size(traces,1);
-    minStates = handles.tra.hmmStatesSlider.get('LowValue');
-    maxStates = handles.tra.hmmStatesSlider.get('HighValue');
+    minStates = handles.tra.hmmStatesSlider.JavaPeer.get('LowValue');
+    maxStates = handles.tra.hmmStatesSlider.JavaPeer.get('HighValue');
         
     for c=1:numTraces
         waitbar(c/numTraces);
@@ -748,6 +765,8 @@ end
 
 %% Exports
 function exportTraces(hObject,handles)
+    preCalculateAllTraces(hObject, handles);
+    
     % get relevent data
     traces = getappdata(handles.f,'traces');
     startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
@@ -758,11 +777,10 @@ function exportTraces(hObject,handles)
     % Set save path to be in a folder "traces".
     % Add this folder to the save directory.
     % If this folder alread exist remove it then add it.
-    flag = mkdir(savePath,'traces');
-    if flag == 0
-        rmdir([savePath, '/traces/'], 's');
-        mkdir(savePath,'traces');
-    end
+    
+    mkdir(savePath,'traces');
+    rmdir([savePath, '/traces/'], 's');
+    mkdir(savePath,'traces');
     savePath = [savePath, '/traces/'];
     
     % export each trace to the traces folder with one file per molecule
@@ -771,10 +789,118 @@ function exportTraces(hObject,handles)
             traces.Donor_hmm(i,x)', traces.Acceptor_hmm(i,x)', traces.FRET_hmm(i,x)']; % create matix of data to save
         
         fileID = fopen([savePath,'trace_', num2str(i), '.dat'],'w'); % create file trace_i.txt
-        fprintf(fileID,'%30s %30s\n','X','Donor','Acceptor','FRET','Donor HMM','Acceptor HMM','FRET HMM'); % add header
-        fprintf(fileID,'%30.25d %30.25d %30.25d %30.25d %30.25d %30.25d %30.25d\r\n',A); % add data
+        fprintf(fileID,'%36s   %36s   %36s   %36s   %36s   %36s   %36s\n','X','Donor','Acceptor','FRET','Donor HMM','Acceptor HMM','FRET HMM'); % add header
+        fprintf(fileID,'%+30.30e   %+30.30e   %+30.30e   %+30.30e   %+30.30e   %+30.30e   %+30.30e\r\n',A'); % add data
         fclose(fileID); % close
     end
 end
 
+function exportTraceImages(hObject,handles)
+    preCalculateAllTraces(hObject, handles);
     
+    % get relevent data
+    currentTrace = getappdata(handles.f,'trace_currentTrace');
+    traces = getappdata(handles.f,'traces');
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    x = (startT:endT);
+    savePath = getappdata(handles.f,'savePath');
+    
+    % Set save path to be in a folder "traces".
+    % Add this folder to the save directory.
+    % If this folder alread exist remove it then add it.
+    mkdir(savePath,'trace_images');
+    rmdir([savePath, '/trace_images/'], 's');
+    mkdir(savePath,'trace_images');
+    savePath = [savePath, '/trace_images/'];
+    
+    % export each trace to the traces folder with one file per molecule
+    hWaitBar = waitbar(0,'Exporting trace images ...', 'WindowStyle', 'modal');
+    for i=1:size(traces,1)
+        waitbar(i/size(traces,1));
+        
+        setTrace(hObject,handles,i);
+        
+        tempFig = figure(2);
+        tempFig.Visible = "off";
+        set(tempFig, 'WindowStyle', 'normal');
+        tempFig.Units = 'inches';
+        tempFig.Position = [0 0 8.5 5.5];
+        hplot1 = copyobj(handles.tra.DAAxes,tempFig);
+        hplot2 = copyobj(handles.tra.FRETAxes,tempFig);
+        hplot1.set('Units','inches');
+        hplot2.set('Units','inches');
+        hplot1.set('Position',[.5 3. 7.5 2.]);
+        hplot2.set('Position',[.5 .5 7.5 2.]);
+        saveas(tempFig,[savePath,'trace_', num2str(i), '.png'])
+        close(tempFig);
+    end
+    
+    % switch back to showing current trace
+    setTrace(hObject,handles,currentTrace);
+    
+    delete(hWaitBar);
+end
+
+function showDwellTime(hObject, handles)
+    preCalculateAllTraces(hObject, handles);
+    
+    % get relevent data
+    traces = getappdata(handles.f,'traces');
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    x = (startT:endT);
+    
+    % set up a serperate figure
+    if isfield(handles,'f2')
+        delete(handles.f2);
+    end
+    handles.f2 = figure(2);
+    ax = axes(handles.f2);
+    
+    % plot the 3 dwell times
+    binSize = 200;
+    ax1 = subplot(1, 3, 1, ax); % left
+    title(ax1, "Donor");
+    donorData = traces.Donor(:,x);
+    histogram(ax1, donorData(:), binSize);
+    
+    ax2 = subplot(1, 3, 2); % middle
+    title(ax2, "Acceptor");
+    acceptorData = traces.Acceptor(:,x);
+    histogram(ax2, acceptorData(:), binSize);
+    
+    ax3 = subplot(1, 3, 3); % right
+    title(ax3, "FRET");
+    fretData = traces.FRET(:,x);
+    histogram(ax3, fretData(:), binSize);
+    
+    % save the handle
+    guidata(hObject,handles);
+end
+
+function exportTransCounts(hObject, handles)
+    preCalculateAllTraces(hObject, handles);
+    
+    % get relevent data
+    traces = getappdata(handles.f,'traces');
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    x = (startT:endT);
+    savePath = getappdata(handles.f,'savePath');
+    
+    fileID = fopen([savePath,'/transition_counts.dat'],'w'); % create file
+    fprintf(fileID,'%12s   %12s   %12s   %12s\n','Molecule','Donor','Acceptor','FRET'); % add header
+    
+    % write counts to file with one line per molecule
+    for i=1:size(traces,1)
+        % count the number of transitions excluding "half transitions"
+        donorCount = floor( sum(diff(traces.Donor_hmm(i,x))~=0) / 2 );
+        acceptorCount = floor( sum(diff(traces.Acceptor_hmm(i,x))~=0) / 2 );
+        fretCount = floor( sum(diff(traces.FRET_hmm(i,x))~=0) / 2 );
+        
+        fprintf(fileID,'%12u   %12u   %12u   %12u\r\n', i, donorCount, acceptorCount, fretCount); % add data
+    end
+    
+    fclose(fileID); % close
+end
