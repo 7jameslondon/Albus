@@ -13,23 +13,34 @@ function handles = createInterface
    
 
     %% setup the toolbar
-    set(groot,'ShowHiddenHandles','on');
-    mainTB = findobj(handles.f.Children,'Type','uitoolbar');
+    try % 
+        set(groot,'ShowHiddenHandles','on');
+        mainTB = findobj(handles.f.Children,'Type','uitoolbar');
 
-    tbFileOpen      = findobj(mainTB.Children,'Tag','Standard.FileOpen');
-    tbSaveFigure    = findobj(mainTB.Children,'Tag','Standard.SaveFigure');
-    tbDataCursor    = findobj(mainTB.Children,'Tag','Exploration.DataCursor');
-    ttZoomIn        = findobj(mainTB.Children,'Tag','Exploration.ZoomIn');
-    ttZoomOut       = findobj(mainTB.Children,'Tag','Exploration.ZoomOut');
+        tbFileOpen      = findobj(mainTB.Children,'Tag','Standard.FileOpen');
+        tbSaveFigure    = findobj(mainTB.Children,'Tag','Standard.SaveFigure');
+        tbDataCursor    = findobj(mainTB.Children,'Tag','Exploration.DataCursor');
+        ttZoomIn        = findobj(mainTB.Children,'Tag','Exploration.ZoomIn');
+        ttZoomOut       = findobj(mainTB.Children,'Tag','Exploration.ZoomOut');
 
-    delete(setdiff(mainTB.Children,[tbFileOpen tbSaveFigure tbDataCursor ttZoomIn ttZoomOut]))
-    
-    tbSaveFigure.set('ClickedCallback',@(~,~) saveSession(handles.f));
-    tbFileOpen.set('ClickedCallback',@(~,~) loadSession(handles.f));
-    
-    tbSaveFigure.set('TooltipString','Save Session');
-    tbFileOpen.set('TooltipString','Load Session');
+        delete(setdiff(mainTB.Children,[tbFileOpen tbSaveFigure tbDataCursor ttZoomIn ttZoomOut]))
 
+        tbSaveFigure.set('ClickedCallback',@(~,~) saveSession(handles.f));
+        tbFileOpen.set('ClickedCallback',@(~,~) loadSession(handles.f));
+
+        tbSaveFigure.set('TooltipString','Save Session');
+        tbFileOpen.set('TooltipString','Load Session');
+    catch
+        delete(handles.f);
+        handles.f = figure( 'Name','Albus 0.4', ...
+                        'NumberTitle','off', ...
+                        'ToolBar','none', ...
+                        'MenuBar','none', ...
+                        'Units', 'characters', ...
+                        'Position', [20 10 150 50], ...
+                        'Visible', 'off',...
+                        'DeleteFcn', @(hObject,~) closeProgram(hObject,guidata(hObject)));
+    end
 
     %% main framework
     handles.HBox = uix.HBox('Parent', handles.f);
