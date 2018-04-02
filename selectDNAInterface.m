@@ -211,7 +211,7 @@ function handles = createInterface(handles)
     % Delete note
     handles.dna.manualDNADeleteText = uicontrol('Parent', handles.dna.manualDNABox,...
                                                 'Style','text',...
-                                                'String', 'Delete any DNA by right clicking the line and selecting "Delete"');
+                                                'String', 'Delete any DNA by right clicking the line and selecting ''Delete''');
     % button box
     handles.dna.manualDNAButtonBox = uix.HBox('Parent', handles.dna.manualDNABox);
     % Clear
@@ -677,8 +677,8 @@ end
 
 %% Auto Dectect DNA
 function autoDetectDNA(hObject, handles)
-    removeAns = questdlg("Are you sure? This will clear all DNAs.","Are you sure? This will clear all DNAs.","Yes, clear all","No","No");
-    if strcmp(removeAns, "No")
+    removeAns = questdlg('Are you sure? This will clear all DNAs.','Are you sure? This will clear all DNAs.','Yes, clear all','No','No');
+    if strcmp(removeAns, 'No')
         return;
     end
     
@@ -874,8 +874,8 @@ function removeAllDNA(hObject,handles)
 end
 
 function removeAllDNA_Callback(hObject,handles)
-    removeAns = questdlg("Are you sure you want to clear all DNAs?","Are you sure you want to clear all DNAs?","Yes, clear all","No","No");
-    if strcmp(removeAns, "Yes, clear all")
+    removeAns = questdlg('Are you sure you want to clear all DNAs?','Are you sure you want to clear all DNAs?','Yes, clear all','No','No');
+    if strcmp(removeAns, 'Yes, clear all')
         removeAllDNA(hObject,handles);
     end
 end

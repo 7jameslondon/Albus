@@ -414,31 +414,33 @@ function switchMode(hObject, handles, value)
             updateDisplay(hObject,handles);
             % zoom axes
             handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag());
+            
+            if ~getappdata(handles.f,'isMapped')
+                % create croping imrect
+                hImrect = getappdata(handles.f, 'vid_imrect');
+                if isempty(hImrect)
+                    pos = getappdata(handles.f, 'vid_imrectPos');
+                    if isempty(pos)
+                        pos = [handles.oneAxes.Axes.XLim(1), handles.oneAxes.Axes.YLim(1), diff(handles.oneAxes.Axes.XLim), diff(handles.oneAxes.Axes.YLim)];
+                        setappdata(handles.f, 'vid_imrectPos', pos);
+                    end
+
+                    constFcn = makeConstrainToRectFcn('imrect',get(handles.oneAxes.Axes,'XLim'),get(handles.oneAxes.Axes,'YLim'));
+
+                    hImrect = imrect(handles.oneAxes.Axes, pos, 'PositionConstraintFcn',constFcn);
+                    hImrect.addNewPositionCallback(@(pos) moveCropImRect(handles.f,hImrect));
+                    hImrect.setColor('red');
+
+                    setappdata(handles.f, 'vid_imrect', hImrect);
+                    moveCropImRect(handles.f,hImrect);
+                end
+            end
     end
     
     if getappdata(handles.f,'isMapped')
         handles.axesControl.seperateButtonGroup.Visible =  'on';
     else
         handles.axesControl.seperateButtonGroup.Visible =  'off';
-        
-        % create croping imrect
-        hImrect = getappdata(handles.f, 'vid_imrect');
-        if isempty(hImrect)
-            pos = getappdata(handles.f, 'vid_imrectPos');
-            if isempty(pos)
-                pos = [handles.oneAxes.Axes.XLim(1), handles.oneAxes.Axes.YLim(1), diff(handles.oneAxes.Axes.XLim), diff(handles.oneAxes.Axes.YLim)];
-                setappdata(handles.f, 'vid_imrectPos', pos);
-            end
-            
-            constFcn = makeConstrainToRectFcn('imrect',get(handles.oneAxes.Axes,'XLim'),get(handles.oneAxes.Axes,'YLim'));
-            
-            hImrect = imrect(handles.oneAxes.Axes, pos, 'PositionConstraintFcn',constFcn);
-            hImrect.addNewPositionCallback(@(pos) moveCropImRect(handles.f,hImrect));
-            hImrect.setColor('red');
-
-            setappdata(handles.f, 'vid_imrect', hImrect);
-            moveCropImRect(handles.f,hImrect);
-        end
     end
 end
 

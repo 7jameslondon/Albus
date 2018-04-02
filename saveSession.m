@@ -18,7 +18,7 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
     
     session = struct();
     
-    session.version         = 0.42;
+    session.version         = 0.421;
     session.ROI             = getappdata(handles.f,'ROI');
     session.colors          = getappdata(handles.f,'colors');
     session.mode            = getappdata(handles.f,'mode');

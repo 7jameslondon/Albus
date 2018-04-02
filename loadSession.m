@@ -29,7 +29,7 @@ function loadSession(hObject)
     if ~isfield(session, 'kym_lowBrightness')
         session.kym_invertImage   = false;
         session.kym_lowBrightness = 0;
-        session.kym_higBrightness = 1e6;
+        session.kym_highBrightness = 1e6;
     end
     % create combinedROIMask
     if ~isfield(session,'combinedROIMask')
