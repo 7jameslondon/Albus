@@ -8,13 +8,28 @@ function loadSession(hObject)
     load([loadPath loadName]);
     
     %% Handles changes from old versions
+    % create save path
     if ~isfield(session,'savePath')
         uiwait(msgbox('What folder should data be saved in?','Save'));
         session.savePath = uigetdir('Where should the data be saved'); 
     end
-    
+    % create traces
     if ~isfield(session.kyms, 'Traces')
         session.kyms.Traces(:,1) = cell(size(session.kyms,1),1);
+    end
+    % switch dna auto settings
+    if ~isfield(session, 'dna_autoDnaMaxLength')
+        session.dna_autoDnaMaxLength = 100;
+        
+        session.dna_autoDnaBinaryThreshold  = str2double(session.dna_autoDnaBinaryThreshold);
+        session.dna_autoDnaMinLength        = str2double(session.dna_autoDnaMinLength);
+        session.dna_autoDnaMinEccentricity  = str2double(session.dna_autoDnaMinEccentricity);
+    end
+    % create kymograph brightness
+    if ~isfield(session, 'kym_lowBrightness')
+        session.kym_invertImage   = false;
+        session.kym_lowBrightness = 0;
+        session.kym_higBrightness = 1e6;
     end
     
     %% Setup general variables
@@ -47,9 +62,10 @@ function loadSession(hObject)
     waitbar(3/5,hWaitBar)
     
     %% Setup all the other interfaces
-    selectDNAInterface('loadFromSession', hObject,handles,session);
-    selectFRETInterface('loadFromSession', hObject,handles,session);
-    tracesInterface('loadFromSession', hObject,handles,session);
+    handles = selectDNAInterface('loadFromSession', hObject,handles,session);
+    handles = selectFRETInterface('loadFromSession', hObject,handles,session);
+    handles = tracesInterface('loadFromSession', hObject,handles,session);
+    handles = kymographInterface('loadFromSession',hObject,handles,session);
     waitbar(4/5,hWaitBar)
     
     %% Move to correct interface

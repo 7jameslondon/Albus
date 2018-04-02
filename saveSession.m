@@ -70,9 +70,10 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             session.dna_highBrightness  = get(handles.dna.brightness.JavaPeer, 'HighValue');
             session.dna_timeAvg         = handles.dna.sourceTimeAvgCheckBox.Value;
             
-            session.dna_autoDnaBinaryThreshold = handles.dna.autoDnaBinaryThresholdTextBox.String;
-            session.dna_autoDnaMinLength       = handles.dna.autoDnaMinLengthTextBox.String;
-            session.dna_autoDnaMinEccentricity = handles.dna.autoDnaMinEccentricityTextBox.String;
+            session.dna_autoDnaBinaryThreshold = str2double(handles.dna.autoDnaBinaryThresholdTextBox.String);
+            session.dna_autoDnaMinLength       = str2double(handles.dna.autoDnaLengthMinTextBox.String);
+            session.dna_autoDnaMaxLength       = str2double(handles.dna.autoDnaLengthMaxTextBox.String);
+            session.dna_autoDnaMinEccentricity = str2double(handles.dna.autoDnaMinEccentricityTextBox.String);
             
             % update any changes that result from Imline moves
             if strcmp(getappdata(handles.f,'mode'),'Select DNA')
@@ -81,6 +82,12 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
                 kymographInterface('refreshKymAxes',hObject,handles);
             end
             session.kyms = getappdata(handles.f,'kyms');
+            
+        %% Kymographs
+        % this data will always be saved unlike the above        
+            session.kym_invertImage     = handles.kym.invertCheckbox.Value;
+            session.kym_lowBrightness   = get(handles.kym.brightness.JavaPeer, 'LowValue');
+            session.kym_highBrightness  = get(handles.kym.brightness.JavaPeer, 'HighValue');
             
         %% Select FRET
         % this data will always be saved unlike the above

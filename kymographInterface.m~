@@ -34,36 +34,37 @@ function handles = createInterface(handles)
     
     % Width
     handles.kym.widthBox = uix.HBox('Parent', handles.kym.settingsBox);
-    uix.Empty('Parent', handles.kym.widthBox);
+    uix.HBox('Parent', handles.kym.settingsBox);
     uicontrol(  'Parent', handles.kym.widthBox,...
                 'style', 'text',...
                 'String', 'Width:');
     handles.kym.widthTextbox = uicontrol(   'Parent', handles.kym.widthBox,...
                                         'style', 'edit',...
                                         'String', '1');
-    uix.Empty('Parent', handles.kym.widthBox);
     handles.kym.widthBox.set('Widths',[-1 50 50 -1]);
-    
-    % Brightness
-    uicontrol( 'Parent', handles.kym.settingsBox,...
+                                    
+    uicontrol( 'Parent', handles.dna.preProcBox,...
                'Style' , 'text', ...
                'String', 'Brightness');
-    [~, handles.kym.brightness] = javacomponent('com.jidesoft.swing.RangeSlider');
-    handles.kym.brightness.set('Parent', handles.kym.settingsBox);
-    handles.kym.brightness.JavaPeer.set('Maximum', 1e6);
-    handles.kym.brightness.JavaPeer.set('Minimum', 0);
-    handles.kym.brightness.JavaPeer.set('LowValue', 0);
-    handles.kym.brightness.JavaPeer.set('HighValue', 1e6);
-    handles.kym.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.kym.brightness));
+    [~, handles.dna.brightness] = javacomponent('com.jidesoft.swing.RangeSlider');
+    handles.dna.brightness.set('Parent', handles.dna.preProcBox);
+    handles.dna.brightness.JavaPeer.set('Maximum', 1e6);
+    handles.dna.brightness.JavaPeer.set('Minimum', 0);
+    handles.dna.brightness.JavaPeer.set('LowValue', 0);
+    handles.dna.brightness.JavaPeer.set('HighValue', 1e6);
+    handles.dna.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.dna.brightness));
+    
     % auto brightness and invert box
-    handles.kym.autoAndInvertHBox = uix.HBox('Parent', handles.kym.settingsBox);
+    handles.dna.autoAndInvertHBox = uix.HBox('Parent', handles.dna.preProcBox);
+    
     % invert
-    handles.kym.invertCheckbox = uicontrol(     'Parent', handles.kym.autoAndInvertHBox,...
+    handles.dna.invertCheckbox = uicontrol(     'Parent', handles.dna.autoAndInvertHBox,...
                                                 'Style', 'checkbox',...
                                                 'String', 'Invert',...
-                                                'Callback', @(hObject,~) setInvert(hObject, guidata(hObject), hObject.Value));
+                                                'Callback', @(hObject,~) setInvert(hObject, guidata(hObject),hObject.Value));
+    
     % auto brightness
-    handles.kym.autoBrightnessButton = uicontrol('Parent', handles.kym.autoAndInvertHBox,...
+    handles.dna.autoBrightnessButton = uicontrol('Parent', handles.dna.autoAndInvertHBox,...
                                                  'String', 'Auto Brightness',...
                                                  'Callback', @(hObject,~) autoBrightness(hObject, guidata(hObject)));
                                     
@@ -135,7 +136,7 @@ function handles = createInterface(handles)
     handles.kym.traceBox.set('Heights', [30 300]);
                                                  
     %% 
-    handles.kym.leftPanel.set('Heights',[25 120 80 60 60 400]);
+    handles.kym.leftPanel.set('Heights',[25 50 80 60 60 400]);
     
     
     %% Right panel
@@ -243,13 +244,6 @@ function handles = createInterface(handles)
 end
 
 %% Updates
-
-function handles = loadFromSession(hObject,handles,session)
-    handles.kym.invertCheckbox.Value = session.kym_invertImage;
-    set(handles.kym.brightness.JavaPeer, 'LowValue', session.kym_lowBrightness);
-    set(handles.kym.brightness.JavaPeer, 'HighValue', session.kym_highBrightness);
-end
-            
 function getDataFromSelectedDNA(hObject, handles)
     hWaitBar = waitbar(0,'Generating kymographs...', 'WindowStyle', 'modal');
     
@@ -340,50 +334,6 @@ function updateTable(hObject,handles)
     handles.kym.table.Data = xy2rdiff(kyms.Position(:,[1 3]), kyms.Position(:,[2 4]));
 end
 
-%% Brightness Callbacks
-function setBrightness(hObject)
-    handles = guidata(hObject);
-    lowBrightness = get(handles.kym.brightness.JavaPeer,'LowValue');
-    highBrightness = get(handles.kym.brightness.JavaPeer,'HighValue');
-    if lowBrightness==highBrightness
-        if lowBrightness==0
-            set(handles.kym.brightness.JavaPeer,'HighValue',highBrightness+1)
-        else
-            set(handles.kym.brightness.JavaPeer,'LowValue',lowBrightness-1)
-        end
-    end
-    
-    selectDNA(hObject, handles, getappdata(handles.f,'data_currentDNA'));
-end
-
-function autoBrightness(hObject, handles)
-    % get the current kymograph
-    row = getappdata(handles.f,'data_currentDNA');
-    kymImages = getappdata(handles.f,'data_kym_images');
-    I = kymImages{row};
-    
-    % invert the image as requested
-    if handles.kym.invertCheckbox.Value
-        I = imcomplement(I);
-    end
-
-    % calculate auto brightness
-    autoImAdjust = stretchlim(I);
-
-    % set the brightness sliders
-    autoImAdjust = round(autoImAdjust * get(handles.kym.brightness.JavaPeer,'Maximum'));
-    set(handles.kym.brightness.JavaPeer,'LowValue',autoImAdjust(1));
-    set(handles.kym.brightness.JavaPeer,'HighValue',autoImAdjust(2));
-
-    % update the displayed image
-    selectDNA(hObject, handles, getappdata(handles.f,'data_currentDNA'));
-end
-
-function setInvert(hObject, handles, value)
-    handles.kym.invertCheckbox.Value = value;
-    autoBrightness(hObject,handles); % this will also update the display
-end
-
 %% DNA Selection
 function tableCallback(hObject,eventdata,handles)
     if size(eventdata.Indices,1) == 0
@@ -412,16 +362,9 @@ function selectDNA(hObject, handles, row)
     
     kyms = getappdata(handles.f,'kyms');
     kymImages = getappdata(handles.f,'data_kym_images');
-    lowBrightness = get(handles.kym.brightness.JavaPeer,'LowValue')/get(handles.kym.brightness.JavaPeer,'Maximum');
-    highBrightness = get(handles.kym.brightness.JavaPeer,'HighValue')/get(handles.kym.brightness.JavaPeer,'Maximum');
-    kymI = kymImages{row};
-    if handles.kym.invertCheckbox.Value
-        kymI = imcomplement(kymI);
-    end
-    kymI = imadjust(kymI, [lowBrightness highBrightness]);
     
     % kymograph
-    handles.kym.kymAxesAPI.replaceImage(kymI,'PreserveView',true);
+    handles.kym.kymAxesAPI.replaceImage(kymImages{row},'PreserveView',true);
     
     % dna
     handles.kym.dnaAxesAPI.replaceImage(selectDNAInterface('getCurrentImage',hObject,handles),'PreserveView',true);

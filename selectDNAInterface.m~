@@ -197,8 +197,6 @@ function handles = createInterface(handles)
     handles.dna.autoDnaDetectionButton = uicontrol(  'Parent', handles.dna.autoDNABox,...
                                                      'String', 'Auto Detect DNA',...
                                                      'Callback', @(hObject,~) autoDetectDNA(hObject, guidata(hObject)));
-    % Heights             
-    handles.dna.autoDNABox.set('Heights',[15 20 15 20 15 20 25]);
                                                  
     %% Manual DNA Detection
     handles.dna.manualDNAPanel = uix.BoxPanel(  'Parent', handles.dna.leftPanel,...
@@ -213,17 +211,17 @@ function handles = createInterface(handles)
                                                 'Style','text',...
                                                 'String', 'Delete any DNA by right clicking the line and selecting "Delete"');
     % button box
-    handles.dna.manualDNAButtonBox = uix.HBox('Parent', handles.dna.manualDNABox);
+    handles.dna.manualDNAButtonBox = uix.HButtonBox('Parent', handles.dna.manualDNABox,...
+                                                    'ButtonSize',[120 30],...
+                                                    'Spacing',2);
     % Clear
     handles.dna.manualDNAClearButton = uicontrol(   'Parent', handles.dna.manualDNAButtonBox,...
                                                     'String', 'Clear All DNA',...
                                                     'Callback', @(hObject,~) removeAllDNA_Callback(hObject, guidata(hObject)));
     % Add
     handles.dna.manualDNAAddButton = uicontrol( 'Parent', handles.dna.manualDNAButtonBox,...
-                                                'String', 'Manually Add DNA Mode',...
+                                                'String', 'Manually Add DNA',...
                                                 'Callback', @(hObject,~) activateManualMode(hObject, guidata(hObject)));
-    % widths
-    handles.dna.manualDNAButtonBox.set('Widths',[-1 -2]);
                                                 
     %% Kymographs
     handles.dna.kymPanel = uix.BoxPanel(  'Parent', handles.dna.leftPanel,...
@@ -239,7 +237,7 @@ function handles = createInterface(handles)
                                                 'Callback', @(hObject,~) openKymographs(hObject, guidata(hObject)));
                                                  
     %% 
-    handles.dna.leftPanel.set('Heights',[25 200 165 80 60]);
+    handles.dna.leftPanel.set('Heights',[25 200 185 100 60]);
 end
 
 %% Load from session
@@ -679,9 +677,9 @@ end
 
 %% Auto Dectect DNA
 function autoDetectDNA(hObject, handles)
-    removeAns = questdlg("Are you sure? This will clear all DNAs.","Are you sure? This will clear all DNAs.","Yes, clear all","No","No");
-    if strcmp(removeAns, "No")
-        return;
+    removeAns = questdlg("Are you sure? This will clear all DNAs.","Are you sure you want to clear all DNAs?","Yes, clear all","No","No");
+    if strcmp(removeAns, "Yes, clear all")
+        removeAllDNA(hObject,handles);
     end
     
     hWaitBar = waitbar(0,'Finding DNA ...');
