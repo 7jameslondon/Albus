@@ -11,8 +11,11 @@ end
 %% CreateInterface
 function handles = createInterface(handles)
     setappdata(handles.f,'video_mode','Select Video');
+    setappdata(handles.f, 'vid_imrect', []);
+    setappdata(handles.f, 'vid_imrectPos', []);
 
     handles.vid = struct();
+        
     handles.vid.leftPanel = uix.VBox( 'Parent', handles.leftPanel);
     
     %% back
@@ -44,7 +47,7 @@ function handles = createInterface(handles)
     
     %% edit
     handles.vid.editPanel = uix.BoxPanel('Parent', handles.vid.leftPanel,...
-                                                'Title', 'Select the mapping video',...
+                                                'Title', 'Settings',...
                                                 'Visible', 'off');
                                             
     handles.vid.editBox = uix.VBox('Parent', handles.vid.editPanel,...
@@ -88,6 +91,7 @@ function handles = createInterface(handles)
     handles.vid.cutting.JavaPeer.set('MouseReleasedCallback', @(~,~) setCutting(handles.vid.cutting));
     
     handles.vid.editBox.set('Heights',[25 25 25 25 25 25 ]);
+
     %%
     handles.vid.leftPanel.set('Heights',[25 80 200]);
     
@@ -179,6 +183,9 @@ function handles = loadFromSession(hObject,handles,session)
     set(handles.vid.brightness.JavaPeer, 'LowValue', session.vid_lowBrightness);
     set(handles.vid.brightness.JavaPeer, 'HighValue', session.vid_highBrightness);
     handles.vid.invertCheckbox.Value = session.vid_invertVideo;
+    
+    % crop
+    setappdata(handles.f, 'vid_imrectPos', session.vid_imrectPos);
     
     setappdata(handles.f,'video_mode',session.vid_mode);
 end
@@ -279,6 +286,13 @@ function pauseVideo(hObject,handles)
     setappdata(handles.f,'Playing_Video',0);
 end
 
+%% Cropping
+function moveCropImRect(hParent,hObject)
+    handles = guidata(hParent);
+    setappdata(handles.f,'combinedROIMask',createMask(hObject));
+    autoBrightness(hParent, handles);
+end
+
 %% Update Display
 function updateDisplay(hObject,handles) 
     if ~exist('handles','var')
@@ -323,10 +337,10 @@ function I = getCurrentOneAxesImage(hObject,handles)
     lowCut = get(handles.vid.cutting.JavaPeer,'LowValue');
     highCut = get(handles.vid.cutting.JavaPeer,'HighValue');
     invertImage = handles.vid.invertCheckbox.Value;
+    combinedROIMask = getappdata(handles.f,'combinedROIMask');
     
     if getappdata(handles.f,'isMapped')
         colors = getappdata(handles.f,'colors');
-        combinedROIMask = getappdata(handles.f,'combinedROIMask');
         seperatedStacks = getappdata(handles.f,'data_video_originalSeperatedStacks');
         
         seperatedFrames = cell(length(seperatedStacks),1); % pre-aloc
@@ -357,8 +371,10 @@ function I = getCurrentOneAxesImage(hObject,handles)
         if invertImage
             I = imcomplement(I);
         end
+        % overalp mask
+        I(~combinedROIMask) = 0;
         % brightness
-        I = imadjust(I, [lowBrightness highBrightness]);
+        I(combinedROIMask) = imadjust(I(combinedROIMask),[lowBrightness highBrightness]);
         
         % color the frame red if it is in the cut region
         if curretFrame < lowCut || curretFrame > highCut
@@ -404,6 +420,25 @@ function switchMode(hObject, handles, value)
         handles.axesControl.seperateButtonGroup.Visible =  'on';
     else
         handles.axesControl.seperateButtonGroup.Visible =  'off';
+        
+        % create croping imrect
+        hImrect = getappdata(handles.f, 'vid_imrect');
+        if isempty(hImrect)
+            pos = getappdata(handles.f, 'vid_imrectPos');
+            if isempty(pos)
+                pos = [handles.oneAxes.Axes.XLim(1), handles.oneAxes.Axes.YLim(1), diff(handles.oneAxes.Axes.XLim), diff(handles.oneAxes.Axes.YLim)];
+                setappdata(handles.f, 'vid_imrectPos', pos);
+            end
+            
+            constFcn = makeConstrainToRectFcn('imrect',get(handles.oneAxes.Axes,'XLim'),get(handles.oneAxes.Axes,'YLim'));
+            
+            hImrect = imrect(handles.oneAxes.Axes, pos, 'PositionConstraintFcn',constFcn);
+            hImrect.addNewPositionCallback(@(pos) moveCropImRect(handles.f,hImrect));
+            hImrect.setColor('red');
+
+            setappdata(handles.f, 'vid_imrect', hImrect);
+            moveCropImRect(handles.f,hImrect);
+        end
     end
 end
 
@@ -430,9 +465,18 @@ function onRelease(hObject,handles)
     end
     
     setappdata(handles.f,'video_currentFrame', get(handles.axesControl.currentFrame.JavaPeer,'Value'));
-    
+        
     % cut video and map it if nessasary
     postProcessVideo(hObject,handles);
+    
+    % remove the croping imrect
+    hImrect = getappdata(handles.f, 'vid_imrect');
+    if ~isempty(hImrect)
+        setappdata(handles.f, 'vid_imrectPos', hImrect.getPosition());
+        delete(hImrect);
+        setappdata(handles.f, 'vid_imrect', []);
+        
+    end
     
     homeInterface('openHome',hObject);
 end

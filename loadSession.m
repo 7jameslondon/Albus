@@ -31,8 +31,19 @@ function loadSession(hObject)
         session.kym_lowBrightness = 0;
         session.kym_higBrightness = 1e6;
     end
+    % create combinedROIMask
+    if ~isfield(session,'combinedROIMask')
+        session.combinedROIMask = true;
+        session.vid_imrectPos = [];
+    end
+    % create version
+    if ~isfield(session,'version')
+        session.version = 0.0;
+    end
+    
     
     %% Setup general variables
+    setappdata(handles.f,'version',session.version);
     setappdata(handles.f,'autoSavePath',session.autoSavePath);
     setappdata(handles.f,'savePath',session.savePath);
     setappdata(handles.f,'ROI',session.ROI); % ROI will each get updated by updateDisplay calls in the GUIs
@@ -40,9 +51,9 @@ function loadSession(hObject)
     setappdata(handles.f,'mode',session.mode);
     setappdata(handles.f,'isMapped',session.isMapped);
     setappdata(handles.f,'kyms',session.kyms);
+    setappdata(handles.f,'combinedROIMask',session.combinedROIMask);
     if isfield(session,'tForm') ~= 0
         setappdata(handles.f,'tForm',session.tForm);
-        setappdata(handles.f,'combinedROIMask',session.combinedROIMask);
     end
     
     %% Setup video interface

@@ -18,12 +18,14 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
     
     session = struct();
     
-    session.ROI         = getappdata(handles.f,'ROI');
-    session.colors      = getappdata(handles.f,'colors');
-    session.mode        = getappdata(handles.f,'mode');
-    session.isMapped    = getappdata(handles.f,'isMapped');
-    session.autoSavePath = saveFullPath;
-    session.savePath    = getappdata(handles.f,'savePath');
+    session.version         = 0.42;
+    session.ROI             = getappdata(handles.f,'ROI');
+    session.colors          = getappdata(handles.f,'colors');
+    session.mode            = getappdata(handles.f,'mode');
+    session.isMapped        = getappdata(handles.f,'isMapped');
+    session.autoSavePath    = saveFullPath;
+    session.savePath        = getappdata(handles.f,'savePath');
+    session.combinedROIMask = getappdata(handles.f,'combinedROIMask');
     
     %% mapping
     if ~strcmp(handles.map.selectVideoTextBox.String, 'No mapping video selected') % is there mapping data to save
@@ -41,7 +43,6 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
     %% tForm
     if isappdata(handles.f,'tForm')
         session.tForm = getappdata(handles.f,'tForm');
-        session.combinedROIMask = getappdata(handles.f,'combinedROIMask');
     end
     
     if ~exist('mappingOnlyFlag','var')
@@ -56,6 +57,7 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             session.vid_lowBrightness   = handles.vid.brightness.JavaPeer.get('LowValue');
             session.vid_highBrightness  = handles.vid.brightness.JavaPeer.get('HighValue');
             session.vid_invertVideo     = handles.vid.invertCheckbox.Value;
+            session.vid_imrectPos       = getappdata(handles.f, 'vid_imrectPos');
         end
 
         %% select DNA

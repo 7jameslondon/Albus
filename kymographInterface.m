@@ -243,7 +243,6 @@ function handles = createInterface(handles)
 end
 
 %% Updates
-
 function handles = loadFromSession(hObject,handles,session)
     handles.kym.invertCheckbox.Value = session.kym_invertImage;
     set(handles.kym.brightness.JavaPeer, 'LowValue', session.kym_lowBrightness);

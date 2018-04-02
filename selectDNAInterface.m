@@ -477,7 +477,7 @@ function switchMode(hObject, handles, value)
             handles.dna.autoDNAPanel.Visible = 'on';
             handles.dna.manualDNAPanel.Visible = 'on';
             handles.dna.kymPanel.Visible = 'on';
-            if ~getappdata(handles.f,'dna_manualMode')
+            if ~getappdata(handles.f,'dna_manualMode') && strcmp(getappdata(handles.f,'mode'),'Select DNA')
                 updateDisplay(hObject,handles);
                 resetDNAGraphics(hObject,handles);
                 handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag()); % update magnification
@@ -491,7 +491,7 @@ function switchMode(hObject, handles, value)
             handles.dna.autoDNAPanel.Visible = 'on';
             handles.dna.manualDNAPanel.Visible = 'on';
             handles.dna.kymPanel.Visible = 'on';
-            if ~getappdata(handles.f,'dna_manualMode')
+            if ~getappdata(handles.f,'dna_manualMode') && strcmp(getappdata(handles.f,'mode'),'Select DNA')
                 updateDisplay(hObject,handles);
                 resetDNAGraphics(hObject,handles);
                 handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag()); % update magnification
@@ -557,10 +557,12 @@ function I = getCurrentImage(hObject,handles,brightnessflag)
     end
     % brightness
     if ~exist('brightnessflag','var') % used for autobrightness
-        I = imadjust(I,[lowBrightness,highBrightness]);
+        I(~combinedROIMask) = 0;
+        I(combinedROIMask) = imadjust(I(combinedROIMask),[lowBrightness,highBrightness]);
+    else
+        % crop overlay
+        I(~combinedROIMask) = 0;
     end
-    % crop overlay
-    I(~combinedROIMask) = 0;
 end
 
 function saveImlinesToKyms(hObject,handles)
@@ -629,12 +631,8 @@ end
 function autoBrightness(hObject, handles)
     I = getCurrentImage(hObject,handles,1); % 1 is for no brightness flag
     
-    if isappdata(handles.f,'data_video_originalSeperatedStacks')
-        combinedROIMask = getappdata(handles.f,'combinedROIMask');
-        autoImAdjust = stretchlim(I(combinedROIMask));
-    else
-        autoImAdjust = stretchlim(I);
-    end
+    combinedROIMask = getappdata(handles.f,'combinedROIMask');
+    autoImAdjust = stretchlim(I(combinedROIMask));
     
     autoImAdjust = round(autoImAdjust * get(handles.dna.brightness.JavaPeer,'Maximum'));
     

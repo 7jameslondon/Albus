@@ -119,11 +119,14 @@ function I = getCurrentOneAxesImage(hObject,handles)
             
     else
         stack = getappdata(handles.f,'data_video_stack');
+        combinedROIMask = getappdata(handles.f,'combinedROIMask');
         
         % current frame
         I = stack(:,:,currentFrame);
-        % auto brightness
-        I = imadjust(I);
+        % overalp mask
+        I(~combinedROIMask) = 0;
+        % brightness
+        I(combinedROIMask) = imadjust(I(combinedROIMask));
     end
 end
 
