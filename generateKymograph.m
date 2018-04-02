@@ -1,11 +1,5 @@
 function kymograph = generateKymograph( centerLine, width, seperatedStacks, colors)
-    % set up the lines to make the kymograph along acording to the 'width'
-    lineVector = [centerLine(3)-centerLine(1) centerLine(4)-centerLine(2)];
-    normalVetor = [lineVector(2) -lineVector(1)]/norm(lineVector);
-    normalVetors = repmat(normalVetor, width, 2) .* repmat([-((width-1)/2):((width-1)/2)]', 1, 4);
-    lines = repmat(centerLine, width, 1) + normalVetors;
-
-    % get the size each layer will be to pre-aloc array sizes
+    % two quick checks that the centerLine is valid
     if xy2r(diff(centerLine([1 3])),diff(centerLine([2 4]))) <= 1 % too small for improfile
         kymograph = 0;
         return;
@@ -14,8 +8,15 @@ function kymograph = generateKymograph( centerLine, width, seperatedStacks, colo
         kymograph = 0;
         return;
     end
+
+    % set up the lines to make the kymograph along acording to the 'width'
+    lineVector = [centerLine(3)-centerLine(1) centerLine(4)-centerLine(2)];
+    normalVetor = [lineVector(2) -lineVector(1)]/norm(lineVector);
+    normalVetors = repmat(normalVetor, width, 2) .* repmat([-((width-1)/2):((width-1)/2)]', 1, 4);
+    lines = repmat(centerLine, width, 1) + normalVetors;
     
-    layerSize = [length(improfile(seperatedStacks{1}(:,:,1), centerLine([1 3]), centerLine([2 4]), 'bilinear')), size(seperatedStacks{1}*width ,3)];
+    % get the size each layer will be to pre-aloc array sizes
+    layerSize = [length(improfile(seperatedStacks{1}(:,:,1), centerLine([1 3]), centerLine([2 4]), 'bilinear')), size(seperatedStacks{1},3)*width];
     % get class of stack
     imageClass = class(seperatedStacks{1}(1,1,1));
     

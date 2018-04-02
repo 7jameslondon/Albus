@@ -10,7 +10,7 @@ end
 
 %% Creation
 function handles = createInterface(handles)
-    kyms = table([],'VariableNames',{'Position'});
+    kyms = table(zeros(0,4), cell(0,1), zeros(0,1), zeros(0,1,'logical'), 'VariableNames', {'Position', 'Traces', 'Mark', 'ImageGenerated'});
     setappdata(handles.f,'kyms',kyms);
     setappdata(handles.f,'data_kym_images',cell(0));
     setappdata(handles.f,'data_currentDNA',1);
@@ -82,18 +82,34 @@ function handles = createInterface(handles)
                                     
     %% Exports
     handles.kym.exportPanel = uix.BoxPanel(  'Parent', handles.kym.leftPanel,...
-                                                'Title','Export',...
-                                                'Padding',5);
+                                             'Title','Export',...
+                                             'Padding',5);
     handles.kym.exportBox = uix.VButtonBox('Parent', handles.kym.exportPanel,...
                                            'ButtonSize', [140 30]);
     
     handles.kym.exportAllKyms = uicontrol(  'Parent', handles.kym.exportBox,...
-                                        'String', 'Export all kymographs',...
-                                        'Callback', @(hObject,~) exportAllKymographs(hObject,guidata(hObject)));
+                                            'String', 'Export all kymographs',...
+                                            'Callback', @(hObject,~) exportAllKymographs(hObject,guidata(hObject)));
                                     
+    %% Tracing
+    handles.kym.tracePanel = uix.BoxPanel(  'Parent', handles.kym.leftPanel,...
+                                            'Title','Traces',...
+                                            'Padding',5);
+    handles.kym.traceBox = uix.VBox('Parent', handles.kym.tracePanel);
+                                      
+    handles.kym.addTraceBox = uix.VButtonBox('Parent', handles.kym.traceBox,...
+                                          'ButtonSize', [140 30]);
+    
+    handles.kym.addTrace = uicontrol(  'Parent', handles.kym.addTraceBox,...
+                                       'String', 'Add trace',...
+                                       'Callback', @(hObject,~) addTrace(hObject,guidata(hObject)));
+                                   
+    handles.kym.traceTable = uitable(handles.kym.traceBox);
+    
+    handles.kym.traceBox.set('Heights', [30 300]);
                                                  
     %% 
-    handles.kym.leftPanel.set('Heights',[25 50 100 60 60]);
+    handles.kym.leftPanel.set('Heights',[25 50 100 60 60 400]);
     
     
     %% Right panel
@@ -136,6 +152,7 @@ function handles = createInterface(handles)
     % imline
     handles.kym.vidImline = imline(handles.kym.vidAxes, [.1 .1; .9 .9]);
     handles.kym.vidImline.addNewPositionCallback(@(pos) moveAImline(handles.f,pos));
+    handles.kym.vidImline.setColor('red');
     % framework size
     handles.kym.vidHBox.set('Widths',[50, -1]);
     handles.kym.vidVBox.set('Heights',[25 -1]);
@@ -164,6 +181,7 @@ function handles = createInterface(handles)
     % imline
     handles.kym.dnaImline = imline(handles.kym.dnaAxes, [.1 .1; .9 .9]);
     handles.kym.dnaImline.addNewPositionCallback(@(pos) moveAImline(handles.f,pos));
+    handles.kym.dnaImline.setColor('red');
     % framework size
     handles.kym.dnaBox.set('Heights',[25 -1]);
     dnaMagBoxPos = get(handles.kym.dnaMagBox,'Position');
@@ -212,11 +230,7 @@ function getDataFromSelectedDNA(hObject, handles)
     width = str2num(handles.kym.widthTextbox.String);
     numDNA = size(kyms,1);
     
-    kyms_images = cell(numDNA,1);
-    for i=1:numDNA % no parfor as seperatedStacks will be broadcast
-        kyms_images{i} = generateKymograph(kyms.Position(i,:), width , seperatedStacks, colors);
-        waitbar(i/numDNA);
-    end
+    kyms_images = generateAllKymographs(kyms.Position, width , seperatedStacks, colors);
     
     setappdata(handles.f,'data_kym_images',kyms_images);
     
@@ -301,6 +315,9 @@ function tableCallback(hObject,eventdata,handles)
 end
 
 function selectDNA(hObject, handles, row)
+    % save positions of current Traces
+    saveImpolysToTraces(hObject,handles);
+    
     if getappdata(handles.f,'Playing_Video')
         pauseVideo(hObject,handles);
     end
@@ -333,6 +350,9 @@ function selectDNA(hObject, handles, row)
     handles.kym.dnaAxesAPI.setMagnificationAndCenter(dnaMag,mean(pos(:,1)),mean(pos(:,2)));
     handles.kym.vidAxesAPI.setMagnificationAndCenter(vidMag,mean(pos(:,1)),mean(pos(:,2)));
     handles.kym.kymPanel.Selection = 1;
+    
+    % traces
+    resetTraceGraphics(hObject,handles);
 end
 
 function prevDNA(hObject,handles)
@@ -444,6 +464,9 @@ function refreshKymAxes(hObject,handles)
     
     % updateTable
     updateTable(hObject,handles);
+    
+    % traces
+    resetTraceGraphics(hObject,handles);
 end
 
 %% Play/pause
@@ -517,3 +540,112 @@ function exportAllKymographs(hObject,handles)
     delete(hWaitBar);
 end
 
+%% Traces
+function addTrace(hObject, handles, initPos)
+    traceImpolys = getappdata(handles.f,'kym_kymImpoly');
+    
+    row = size(traceImpolys,2) + 1;
+    if exist('initPos')
+        traceImpolys{row} = impoly(handles.kym.kymAxes, initPos, 'Closed',false); % poly drawn from initPos
+    else 
+        traceImpolys{row} = impoly(handles.kym.kymAxes, 'Closed',false); % user draws poly
+    end
+    
+    api = iptgetapi(traceImpolys{row});
+    api.setColor('red');
+    api.set('UserData',row);
+    
+    % callbacks
+    api.set('Deletefcn',@deleteTrace); % delete callback
+    
+    % save line handle in cell array
+    setappdata(handles.f,'kym_kymImpoly',traceImpolys);
+end
+
+function deleteTrace(hObject, ~)
+    handles = guidata(hObject);
+    
+    traceImpolys = getappdata(handles.f,'kym_kymImpoly');
+
+    row = get(hObject,'UserData');
+    traceImpolys(row) = []; 
+    
+    % The kym_kymImpoly UserData must now be updated as the rows for  
+    % have shifted after the deletion
+    for i=row:length(traceImpolys)
+        set(traceImpolys{i},'UserData',i);
+    end
+    
+    % save cell array of handles
+    setappdata(handles.f,'kym_kymImpoly',traceImpolys);
+end
+
+function resetTraceGraphics(hObject,handles)
+    % delete the old ones first
+    removeAllTraces(hObject,handles);
+    
+    row = getappdata(handles.f,'data_currentDNA');
+    kyms = getappdata(handles.f,'kyms');
+    traces = kyms.Traces{row};
+    
+    if isempty(traces) % if traces is empty then end
+        % clear the trace table
+        handles.kym.traceTable.Data = [];
+    else
+        tracePositions = traces.Positions;
+
+        % add a imploy for each row in traces
+        for i = 1:size(tracePositions,1)
+            addTrace(hObject, handles, tracePositions{i});
+        end
+
+        % update the trace table with lifetimes
+        handles.kym.traceTable.Data = kyms.Traces{row}.Lifetimes;
+    end
+end
+
+function removeAllTraces(hObject,handles)
+    traceImpolys = getappdata(handles.f,'kym_kymImpoly');
+
+    % delete each imline graphic object
+    for i=1:length(traceImpolys)
+        delete(traceImpolys{i});
+    end
+    
+    setappdata(handles.f,'kym_kymImpoly',cell(0));
+end
+
+function saveImpolysToTraces(hObject,handles)
+    % Find the position of each trace impoly and save the position rather
+    % then the whole graphics object.
+    row = getappdata(handles.f,'data_currentDNA');
+    kyms = getappdata(handles.f,'kyms');
+    traces = kyms.Traces{row};
+    traceImpolys = getappdata(handles.f,'kym_kymImpoly');
+    
+    % if traces is empty it will need the table structure
+    if isempty(traces)
+        traces = table(cell(0,1), zeros(0,1), 'VariableNames', {'Positions', 'Lifetimes'});
+    end
+    
+    removeInd = (1:size(traces,1))'; % a list of all the impoly that no longer exist
+    for i=1:size(traceImpolys,2)
+        % grab the corrisponding traces row number from imploy UserData
+        r = get(traceImpolys{i},'UserData');
+        % grab postions from imploy
+        pos = getPosition(traceImpolys{i});
+        % set position
+        traces.Positions(r) = {pos};
+        % calculate and set lifetime
+        traces.Lifetimes(r) = diff(pos([1 size(pos,1)],1));
+        % since it must still exist remove it from the remove list
+        removeInd(removeInd==r) = [];
+    end
+    
+    % remove all kyms that with no corresponding Imline
+    traces(removeInd,:) = [];
+    
+    % save traces to kyms appdata
+    kyms.Traces(row) = {traces};
+    setappdata(handles.f,'kyms',kyms);
+end

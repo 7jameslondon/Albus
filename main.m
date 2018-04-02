@@ -27,7 +27,7 @@ function main
 
     %% Start Parelle Pool
     try 
-        gcp; 
+        parpool('local', 'IdleTimeout', Inf);
     catch
     end
     
@@ -47,8 +47,8 @@ function main
         end
 
         handles.tim = timer;
-        handles.tim.StartDelay = 5*60;
-        handles.tim.Period = 5*60;
+        handles.tim.StartDelay = 15*60;
+        handles.tim.Period = 15*60;
         handles.tim.ExecutionMode = 'fixedSpacing';
         handles.tim.TimerFcn = @(~, ~) saveSession(handles.f, 1); % '1' is to flag it as an autosave
         start(handles.tim);

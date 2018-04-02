@@ -13,6 +13,10 @@ function loadSession(hObject)
         session.savePath = uigetdir('Where should the data be saved'); 
     end
     
+    if ~isfield(session.kyms, 'Traces')
+        session.kyms.Traces(:,1) = cell(size(session.kyms,1),1);
+    end
+    
     %% Setup general variables
     setappdata(handles.f,'autoSavePath',session.autoSavePath);
     setappdata(handles.f,'savePath',session.savePath);
@@ -72,8 +76,8 @@ function loadSession(hObject)
         delete(handles.tim);
     end
     handles.tim = timer;
-    handles.tim.StartDelay = 5*60;
-    handles.tim.Period = 5*60;
+    handles.tim.StartDelay = 15*60;
+    handles.tim.Period = 15*60;
     handles.tim.ExecutionMode = 'fixedSpacing';
     handles.tim.TimerFcn = @(~, ~) saveSession(handles.f, 1);  % '1' is to flag it as an autosave
     start(handles.tim);

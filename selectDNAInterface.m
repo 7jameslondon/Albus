@@ -11,9 +11,10 @@ end
 %% Creation
 function handles = createInterface(handles)
     setappdata(handles.f,'Playing_Video', 0);
-    setappdata(handles.f,'dna_mode','Source');
-    setappdata(handles.f,'dna_currentFrame',1);
-    setappdata(handles.f,'dna_dnaImlines',cell(0));
+    setappdata(handles.f,'dna_mode', 'Source');
+    setappdata(handles.f,'dna_currentFrame', 1);
+    setappdata(handles.f,'dna_dnaImlines', cell(0));
+    setappdata(handles.f,'dna_manualMode', false);
 
     handles.dna = struct();
     handles.dna.leftPanel = uix.VBox( 'Parent', handles.leftPanel);
@@ -32,13 +33,14 @@ function handles = createInterface(handles)
     
     % source popupmenu
     handles.dna.sourcePopUpMenuBox = uix.HBox('Parent', handles.dna.sourceBox);
-    uicontrol(  'Parent', handles.dna.sourcePopUpMenuBox,...
-                'style', 'text',...
-                'String', 'Source');
+    handles.dna.sourceText = uicontrol( 'Parent', handles.dna.sourcePopUpMenuBox,...
+                                        'style', 'text',...
+                                        'String', 'Source: ');
     handles.dna.sourcePopUpMenu = uicontrol('Parent', handles.dna.sourcePopUpMenuBox,...
                                             'style', 'popupmenu',...
                                           	'String', {'None','Current video','Import new video'},...
                                           	'Callback', @(hObject,~) selectSource(hObject,guidata(hObject)));
+    handles.dna.sourcePopUpMenuBox.set('Width', [60, -1]);
     % import textbox
     handles.dna.importVideoTextbox = uicontrol( 'Parent', handles.dna.sourceBox,...
                                                     'style', 'edit',...
@@ -75,8 +77,6 @@ function handles = createInterface(handles)
     handles.dna.brightness.JavaPeer.set('Minimum', 0);
     handles.dna.brightness.JavaPeer.set('LowValue', 0);
     handles.dna.brightness.JavaPeer.set('HighValue', 1e6);
-    handles.dna.brightness.JavaPeer.set('PaintTicks',true);
-    handles.dna.brightness.JavaPeer.set('MajorTickSpacing',1e5);
     handles.dna.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.dna.brightness));
     
     % auto brightness and invert box
@@ -138,7 +138,7 @@ function handles = createInterface(handles)
                                                 'Padding',5,...
                                                 'Visible','off');
     handles.dna.manualDNABox = uix.VButtonBox('Parent', handles.dna.manualDNAPanel,...
-                                                'ButtonSize',[120 25],...
+                                                'ButtonSize',[120 30],...
                                                 'Spacing',2);
     % Delete note
     handles.dna.manualDNADeleteText = uicontrol('Parent', handles.dna.manualDNABox,...
@@ -147,7 +147,7 @@ function handles = createInterface(handles)
     % Add
     handles.dna.manualDNAAddButton = uicontrol( 'Parent', handles.dna.manualDNABox,...
                                                 'String', 'Manually Add DNA',...
-                                                'Callback', @(hObject,~) addNewDNA(hObject, guidata(hObject)));
+                                                'Callback', @(hObject,~) activateManualMode(hObject, guidata(hObject)));
     % Clear
     handles.dna.manualDNAClearButton = uicontrol(   'Parent', handles.dna.manualDNABox,...
                                                     'String', 'Clear All DNA',...
@@ -160,7 +160,7 @@ function handles = createInterface(handles)
                                           'Padding',5,...
                                           'Visible','off');
     handles.dna.kymBox = uix.VButtonBox('Parent', handles.dna.kymPanel,...
-                                                'ButtonSize',[120 25],...
+                                                'ButtonSize',[120 30],...
                                                 'Spacing',2);
     % kym button
     handles.dna.kymButton = uicontrol( 'Parent', handles.dna.kymBox,...
@@ -177,6 +177,9 @@ function handles = loadFromSession(hObject,handles,session)
     if getappdata(handles.f,'Playing_Video')
         pauseVideo(hObject,handles);
     end
+    
+    % deactivate manule mode if its on
+    deactivateManualMode(hObject, handles);
     
     % source
     handles.dna.sourcePopUpMenu.Value = session.dna_source;
@@ -227,9 +230,7 @@ function handles = loadFromSession(hObject,handles,session)
     handles.dna.autoDnaBinaryThresholdTextBox.String   = session.dna_autoDnaBinaryThreshold;
     handles.dna.autoDnaMinLengthTextBox.String         = session.dna_autoDnaMinLength;
     handles.dna.autoDnaMinEccentricityTextBox.String   = session.dna_autoDnaMinEccentricity;
-    
-    resetDNAGraphics(hObject, handles);
-    
+        
     switchMode(hObject, handles, session.dna_mode);
 end
 
@@ -353,6 +354,8 @@ function onRelease(hObject,handles)
         pauseVideo(hObject,handles);
     end
     
+    deactivateManualMode(hObject, handles);
+    
     % save dna lines
     saveImlinesToKyms(hObject,handles);
     removeAllDNA(hObject,handles);
@@ -385,30 +388,47 @@ function switchMode(hObject, handles, value)
     handles.dna.autoDNAPanel.Visible = 'off';
     handles.dna.manualDNAPanel.Visible = 'off';
     handles.dna.kymPanel.Visible = 'off';
+    handles.dna.manualDNAClearButton.Enable = 'on';
+    handles.dna.sourcePanel.Visible = 'off';
+    handles.dna.backButtonPanel.Visible = 'off';
     
     switch value
         case 'Select Source'
+            handles.dna.sourcePanel.Visible = 'on';
+            handles.dna.backButtonPanel.Visible = 'on';
             
         case 'Edit Current'
+            handles.dna.backButtonPanel.Visible = 'on';
+            handles.dna.sourcePanel.Visible = 'on';
             handles.rightPanel.Visible = 'on';
             handles.dna.preProcBox.Visible = 'on';
             handles.axesControl.currentFramePanel.Visible = 'on';
             handles.dna.autoDNAPanel.Visible = 'on';
             handles.dna.manualDNAPanel.Visible = 'on';
             handles.dna.kymPanel.Visible = 'on';
-            updateDisplay(hObject,handles);
-            resetDNAGraphics(hObject,handles);
-            handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag()); % update magnification
+            if ~getappdata(handles.f,'dna_manualMode')
+                updateDisplay(hObject,handles);
+                resetDNAGraphics(hObject,handles);
+                handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag()); % update magnification
+            end
         case 'Edit Import'
+            handles.dna.backButtonPanel.Visible = 'on';
+            handles.dna.sourcePanel.Visible = 'on';
             handles.rightPanel.Visible = 'on';
             handles.dna.preProcBox.Visible = 'on';
             handles.dna.importVideoTextbox.Visible = 'on';
             handles.dna.autoDNAPanel.Visible = 'on';
             handles.dna.manualDNAPanel.Visible = 'on';
             handles.dna.kymPanel.Visible = 'on';
-            updateDisplay(hObject,handles);
-            resetDNAGraphics(hObject,handles);
-            handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag()); % update magnification
+            if ~getappdata(handles.f,'dna_manualMode')
+                updateDisplay(hObject,handles);
+                resetDNAGraphics(hObject,handles);
+                handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag()); % update magnification
+            end
+        case 'Manual Mode'
+            handles.rightPanel.Visible = 'on';
+            handles.dna.manualDNAPanel.Visible = 'on';
+            handles.dna.manualDNAClearButton.Enable = 'off';
     end
     
     if handles.dna.sourceTimeAvgCheckBox.Value
@@ -627,19 +647,61 @@ function autoDetectDNA(hObject, handles)
 end
 
 %% DNA
+function activateManualMode(hObject, handles)
+    % switch on manual controls
+    handles.dna.manualDNAAddButton.Callback = @(hObject,~) deactivateManualMode(hObject, guidata(hObject));
+    handles.dna.manualDNAAddButton.BackgroundColor = [0.54 0.94 0.54];
+    setappdata(handles.f,'dna_manualMode',true);
+    
+    % disable delete controls
+    setappdata(handles.f,'dna_prevMode', getappdata(handles.f,'dna_mode'));
+    switchMode(hObject, handles, 'Manual Mode');
+    
+    % create a new DNA everytime one is finished
+    while getappdata(handles.f,'dna_manualMode')
+        addNewDNA(hObject, handles);
+    end
+end
+
+function deactivateManualMode(hObject, handles)
+    if getappdata(handles.f,'dna_manualMode')
+        % disable delete controls
+        switchMode(hObject, handles, getappdata(handles.f,'dna_prevMode')); % must happen first
+        
+        % remove the unstarted imline
+        delete(handles.oneAxes.Axes.Children(1));
+        
+        % switch off manual controls
+        handles.dna.manualDNAAddButton.Callback = @(hObject,~) activateManualMode(hObject, guidata(hObject));
+        handles.dna.manualDNAAddButton.BackgroundColor = [0.94 0.94 0.94];
+        setappdata(handles.f,'dna_manualMode',false);
+    end
+end
+
 function addNewDNA(hObject, handles, initPos)
     dnaImlines = getappdata(handles.f,'dna_dnaImlines');
     
     row = size(dnaImlines,2) + 1;
     if exist('initPos')
-        dnaImlines{row} = imline(handles.oneAxes.Axes, initPos); % line drawn from initPos
+        h = imline(handles.oneAxes.Axes, initPos); % line drawn from initPos
     else 
-        dnaImlines{row} = imline(handles.oneAxes.Axes); % user draws line
+        h = imline(handles.oneAxes.Axes); % user draws line
     end
+    
+    if isempty(isvalid(h))
+        return;
+    end
+    
+    dnaImlines{row} = h;
     
     api = iptgetapi(dnaImlines{row});
     api.setColor('red');
     api.set('UserData',row);
+    
+    ch = api.get('Children');
+    cm = get(ch(1),'UIContextMenu');
+    delete(cm.Children(1:3)); % remove the defualt menu
+    uimenu(cm, 'Label', 'Remove', 'Callback', @(~,~)deleteDNA(api)); 
     
     % callbacks
     api.set('Deletefcn',@deleteDNA); % delete callback
@@ -649,8 +711,13 @@ function addNewDNA(hObject, handles, initPos)
 end
 
 function deleteDNA(hObject, ~)
-    handles = guidata(hObject);
+    handles = guidata(hObject.get('Parent'));
     
+    if getappdata(handles.f,'dna_manualMode')
+        msgbox('You can not delete in manual mode');
+        return;
+    end
+        
     dnaImlines = getappdata(handles.f,'dna_dnaImlines');
 
     row = get(hObject,'UserData');
@@ -664,6 +731,10 @@ function deleteDNA(hObject, ~)
     
     % save cell array of handles
     setappdata(handles.f,'dna_dnaImlines',dnaImlines);
+    
+    % remove the graphic object
+    hObject.set('Deletefcn',[]);
+    delete(hObject);
 end
 
 function resetDNAGraphics(hObject,handles)
@@ -674,7 +745,6 @@ function resetDNAGraphics(hObject,handles)
     linePos = kyms.Position;
     
     % add a dna for each row in linePos
-    dnaImlines = cell(1,size(linePos,1));
     for i = 1:size(linePos,1)
         addNewDNA(hObject, handles, reshape(linePos(i,:),2,[])');
     end
@@ -682,7 +752,6 @@ end
 
 function removeAllDNA(hObject,handles)
     dnaImlines = getappdata(handles.f,'dna_dnaImlines');
-
     % delete each imline graphic object
     for i=1:length(dnaImlines)
         delete(dnaImlines{i});
@@ -705,6 +774,7 @@ function openKymographs(hObject,handles,loadSessionFlag)
     if ~exist('loadSessionFlag','var')
         % onRelase overwrites the appdata kyms so it must be
         % suppressed when loading from session
+        saveSession(handles.f, 1); % auto save
         onRelease(hObject,handles); 
     end
     

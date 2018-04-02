@@ -65,7 +65,7 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             session.dna_channel         = handles.dna.sourceChannelPopUpMenu.Value;
             session.dna_videoFilePath   = handles.dna.importVideoTextbox.String;
             session.dna_currentFrame    = getappdata(handles.f,'dna_currentFrame');
-            session.dna_invertImage     = handles.dna.importVideoTextbox.Value;
+            session.dna_invertImage     = handles.dna.invertCheckbox.Value;
             session.dna_lowBrightness   = get(handles.dna.brightness.JavaPeer, 'LowValue');
             session.dna_highBrightness  = get(handles.dna.brightness.JavaPeer, 'HighValue');
             session.dna_timeAvg         = handles.dna.sourceTimeAvgCheckBox.Value;
@@ -74,14 +74,13 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             session.dna_autoDnaMinLength       = handles.dna.autoDnaMinLengthTextBox.String;
             session.dna_autoDnaMinEccentricity = handles.dna.autoDnaMinEccentricityTextBox.String;
             
-            if strcmp(getappdata(handles.f,'mode'),'Kymographs')
-                % update any changes that result from Imline moves
-                kymographInterface('refreshKymAxes',hObject,handles);
-                session.kyms = getappdata(handles.f,'kyms');
-            else
+            % update any changes that result from Imline moves
+            if strcmp(getappdata(handles.f,'mode'),'Select DNA')
                 selectDNAInterface('saveImlinesToKyms',handles.f,handles);
-                session.kyms = getappdata(handles.f,'kyms');
+            elseif strcmp(getappdata(handles.f,'mode'),'Kymographs')
+                kymographInterface('refreshKymAxes',hObject,handles);
             end
+            session.kyms = getappdata(handles.f,'kyms');
             
         %% Select FRET
         % this data will always be saved unlike the above
