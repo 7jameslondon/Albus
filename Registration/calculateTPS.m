@@ -1,4 +1,4 @@
-function TPS_tform = calculateTPS(A,B,wiggle)
+function W = calculateTPS(A,B,wiggle)
 % Calculates the thin-plate spline(TPS) weights to transform points of A 
 % to the points of B. There is a optional "wiggle" paramerter to allow for 
 % small diffrences between the points if transformed by a "perfect" TPS.
@@ -18,8 +18,6 @@ function TPS_tform = calculateTPS(A,B,wiggle)
     % number of point in A and B
     num_p = size(A,1);
     
-    % U(r) calculates the "bending" energy of a displacments r
-    U = @(r) r.^2 .* log(r);
     % mag(u,v) calculates the Euclidian distance between points u and v
     mag = @(u,v) sqrt(sum((u-v).^2,2));
 
@@ -31,9 +29,9 @@ function TPS_tform = calculateTPS(A,B,wiggle)
     for i=1:num_p
         for j=1:num_p
             if i ~= j
-                K(i,j) = U(mag(B(i,:),B(j,:)));
+                K(i,j) = energyTPS(mag(B(i,:),B(j,:)));
             else
-                K(i,i) = wiggle;
+                K(i,i) = energyTPS(wiggle);
             end
         end
     end
@@ -52,5 +50,5 @@ function TPS_tform = calculateTPS(A,B,wiggle)
     % A_plus - three rows of zeros joined with the bottom of points A.
     A_plus = [A; zeros(3,2)];
     % W
-    W = inv(L)*A_plus;
+    W = L\A_plus;
 end

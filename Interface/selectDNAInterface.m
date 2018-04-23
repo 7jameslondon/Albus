@@ -11,7 +11,7 @@ end
 %% Creation
 function handles = createInterface(handles)
     setappdata(handles.f,'Playing_Video', 0);
-    setappdata(handles.f,'dna_mode', 'Source');
+    setappdata(handles.f,'dna_mode', 'Select Source');
     setappdata(handles.f,'dna_currentFrame', 1);
     setappdata(handles.f,'dna_dnaImlines', cell(0));
     setappdata(handles.f,'dna_manualMode', false);
@@ -700,7 +700,7 @@ function autoDetectDNA(hObject, handles)
     
     removeAllDNA(hObject,handles); % remove the old DNAs
     dnaLines = zeros(length(validIds),4); % pre-aloc
-    for i=1:length(validIds)
+    for i=1:size(validIds,2)
         % get all pixles of each valid serpated object
         cords = stats(validIds(i)).PixelList;
         

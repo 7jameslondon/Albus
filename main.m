@@ -6,6 +6,10 @@ function main
 
     %% Include files
     mpath = fileparts(which(mfilename));
+    addpath([mpath '/Registration']);
+    addpath([mpath '/Interface']);
+    addpath([mpath '/Tracking']);
+    
     addpath([mpath '/vbfret']);
     addpath([mpath '/vbfret/src']);
     addpath([mpath '/vbfret/ext_src']);
