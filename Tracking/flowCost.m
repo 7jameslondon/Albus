@@ -19,9 +19,8 @@ end
 % cost
 c = l1*(1-d) + l2*(1-s) ;
 
-% normalize the value such that it is between -1e6 and -1
+% normalize the value such that it is between 0 and -1
 c = -1/(c+1);
-c = round(c*1e6);
 
 end
 

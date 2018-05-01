@@ -919,24 +919,22 @@ function showTDP(hObject, handles)
     X = X/gridSpacing;
     Y = Y/gridSpacing;
     
-    sig = 0.001;
-    gauss2d = @(x0,y0,a) a*exp( -((X-x0).^2 + (Y-y0).^2) / (sig^2) );
-    
     for i=1:size(traces,1)
         fret = traces.FRET_hmm(i,T);
         states = unique(fret);
         
         for s=1:size(states,2)
-            % location of current states
             loc = states(s) == fret;
 
-            stop = 1; % reset
+            a       = states(s);
+            sig     = 0.001;
+            z = @(x,y) a*exp( -((X-x).^2 + (Y-y).^2) / (sig^2) );
+            
+            stop    = 1;
             while any(loc(stop:end)) && stop~=size(fret,2)
-                % find location of first continous state 'state(s)'
                 start = find(loc(stop:end), 1, 'first') + stop - 1;
                 stop  = find(~loc(start:end), 1, 'first') + start -1;
                 
-                % do not include states on the ends of the trace
                 if isempty(stop) % transition is after end of trace
                     break;
                 end
@@ -947,7 +945,7 @@ function showTDP(hObject, handles)
                 startFRET = fret(max(start-1,1));
                 stopFRET  = fret(stop);
 
-                TDP = TDP + gauss2d(startFRET,stopFRET,states(s));
+                TDP = TDP + z(startFRET,stopFRET);
             end
         end
     end
