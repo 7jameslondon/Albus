@@ -138,7 +138,7 @@ function onDisplay(hObject,handles)
         if getappdata(handles.f,'isMapped')
             seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
             set(handles.axesControl.currentFrame.JavaPeer,'Maximum',size(seperatedStacks{1},3));
-            
+            handles.axesControl.seperateButtonGroup.Visible =  'on';
         else
             stack = getappdata(handles.f,'data_video_stack');
             set(handles.axesControl.currentFrame.JavaPeer,'Maximum',size(stack,3));
@@ -152,6 +152,7 @@ function onDisplay(hObject,handles)
         % play button
         handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
         % axes control
+        handles.axesControl.currentFramePanel.Visible = 'on';
         handles.axesControl.seperateButtonGroup.set('SelectionChangedFcn', @(hObject,event) switchDisplayAxes(hObject,str2num(event.NewValue.Tag))); 
         % update display
         updateDisplay(hObject,handles);

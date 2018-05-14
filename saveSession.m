@@ -18,7 +18,7 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
     
     session = struct();
     
-    session.version         = 0.421;
+    session.version         = 0.422;
     session.ROI             = getappdata(handles.f,'ROI');
     session.colors          = getappdata(handles.f,'colors');
     session.mode            = getappdata(handles.f,'mode');
@@ -40,9 +40,9 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
         session.map_particleSettings = getappdata(handles.f,'mapping_particleSettings');
     end
     
-    %% tForm
-    if isappdata(handles.f,'tForm')
-        session.tForm = getappdata(handles.f,'tForm');
+    %% displacmentFields
+    if isappdata(handles.f,'displacmentFields')
+        session.displacmentFields = getappdata(handles.f,'displacmentFields');
     end
     
     if ~exist('mappingOnlyFlag','var')

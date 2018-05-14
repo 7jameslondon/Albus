@@ -6,10 +6,11 @@ function W = calculateTPS(A,B,wiggle)
 % The varibles follow convension as described in the refrence.
 %
 % Bases in part on:
-% G. Donato and S. Belongie, ?Approximate thin plate spline mappings,? in 
+% G. Donato and S. Belongie, Approximate thin plate spline mappings, in 
 % Proceedings of the European Conference on Computer Vision, 2002, 
-% pp. 13?31.
-    
+% pp. 13-31.
+    warning('off','MATLAB:singularMatrix');
+
     %% Setup varibles and functions
     % if the wiggle parameter was not passed then set it to zero
     if ~exist('wiggle','var')
@@ -17,9 +18,6 @@ function W = calculateTPS(A,B,wiggle)
     end
     % number of point in A and B
     num_p = size(A,1);
-    
-    % mag(u,v) calculates the Euclidian distance between points u and v
-    mag = @(u,v) sqrt(sum((u-v).^2,2));
 
     %% Calculate the sections of the L matrix
     % K - the bending energies between the points in B.
@@ -29,9 +27,9 @@ function W = calculateTPS(A,B,wiggle)
     for i=1:num_p
         for j=1:num_p
             if i ~= j
-                K(i,j) = energyTPS(mag(B(i,:),B(j,:)));
+                K(i,j) = energyTPS(norm(B(i,:)-B(j,:)));
             else
-                K(i,i) = energyTPS(wiggle);
+                K(i,i) = energyTPS(wiggle); % wiggle=0 => energyTPS=0
             end
         end
     end
@@ -50,5 +48,8 @@ function W = calculateTPS(A,B,wiggle)
     % A_plus - three rows of zeros joined with the bottom of points A.
     A_plus = [A; zeros(3,2)];
     % W
-    W = L\A_plus;
+    W = L\A_plus; % not inv(L)*A_plus
+    
+    warning('on','MATLAB:singularMatrix');
 end
+

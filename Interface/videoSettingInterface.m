@@ -148,7 +148,7 @@ function handles = setControlsForNewVideo(hObject, handles)
     handles.vid.invertCheckbox.Value   = 0;
         
     % collocalize
-    if isappdata(handles.f,'tForm')
+    if getappdata(handles.f,'isMapped')
         mappingInterface('collocalizeVideo',hObject,handles);
     end
     
@@ -164,6 +164,18 @@ function handles = loadFromSession(hObject,handles,session)
     % get the stack
     handles = setVideoFile(hObject, handles, session.vid_videoFilePath);
     stack = getappdata(handles.f,'data_video_originalStack');
+    if stack==0 % the file could not be located
+        uiwait(msgbox('The original video file could not be found. Please locate the new location of the video and select it.'));
+        
+        [fileName, fileDir, ~] = uigetfile({'*.tif';'*.tiff';'*.TIF';'*.TIFF'}, 'Select the video file'); % prompt user for file
+        if fileName ~= 0 % if user does not presses cancel
+            handles = setVideoFile(hObject, handles, [fileDir fileName]);
+        else
+            handles.vid.selectVideoTextBox.String = session.vid_videoFilePath;
+            delete(handles.f);
+        end
+        stack = getappdata(handles.f,'data_video_originalStack');
+    end
     
     % frame controls
     % set max before values

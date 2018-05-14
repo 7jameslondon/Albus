@@ -136,15 +136,13 @@ function particlesByFrame = findParticles( varargin )
     % only be used when a single image is provided.
     if ~isempty(v.DisplayAxes)
         axes(v.DisplayAxes);
-        for i = 1:size(particlesByFrame{1},1)
-            hold on;
-            if strcmp(v.Method,'GaussianFit')
-                plt = plot(particlesByFrame{1}.Center(i,1), particlesByFrame{1}.Center(i,2), '.');
-            else
-                plt = plot(particlesByFrame{1}(i,1), particlesByFrame{1}(i,2), '.');
-            end
-            set(plt,'Color',v.Color)
+        hold on;
+        if strcmp(v.Method,'GaussianFit')
+            plt = plot(particlesByFrame{1}.Center(:,1), particlesByFrame{1}.Center(:,2), '.');
+        else
+            plt = plot(particlesByFrame{1}(:,1), particlesByFrame{1}(:,2), '.');
         end
+        set(plt,'Color',v.Color)
         hold off;
     end
     
@@ -224,7 +222,7 @@ function particlesByFrame = findParticles( varargin )
             
             fitInd = ~excludedata(meshX(:), meshY(:), 'box', fitBox);
             
-            [xc,yc,Amp,width] = gauss2dcirc( Z(fitInd),meshX(fitInd),meshY(fitInd),.2 );
+            [xc,yc,Amp,width] = gaussMLH( meshX(fitInd), meshY(fitInd), Z(fitInd), .2 );
 
             particles(p,:) = {[xc,yc],width,Amp,fitBox}; % center, halfwidth, peak, fitbox
         end

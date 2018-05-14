@@ -347,8 +347,8 @@ function handles = setControlsForNewVideo(hObject, handles)
     end
     
     % channel
-    if isappdata(handles.f,'data_mapping_originalSeperatedStacks')
-        numChannels = size(getappdata(handles.f,'data_mapping_originalSeperatedStacks'),1);
+    if getappdata(handles.f,'isMapped')
+        numChannels = size(getappdata(handles.f,'ROI'),1);
         str = cell(numChannels,1);
         for i=1:numChannels
             str{i} = num2str(i);
@@ -379,7 +379,9 @@ function handles = setControlsForNewVideo(hObject, handles)
     handles.axesControl.currentFrameTextbox.String = '1';
     
     % brightness controls
-    autoImAdjust = stretchlim(stack(:,:,1)); % get the auto brightness values    
+    combinedROIMask = getappdata(handles.f,'combinedROIMask');
+    I = stack(:,:,1);
+    autoImAdjust = stretchlim(I(combinedROIMask)); % get the auto brightness values    
     autoImAdjust = round(autoImAdjust * get(handles.fret.brightness.JavaPeer,'Maximum'));
     set(handles.fret.brightness.JavaPeer,'LowValue',autoImAdjust(1));
     set(handles.fret.brightness.JavaPeer,'HighValue',autoImAdjust(2));

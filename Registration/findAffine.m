@@ -14,7 +14,7 @@ function [B_affine, flag] = findAffine(A, B, tol, maxIter, maxNeighbor)
 %% Setup variables, functions and safty check values
 % setup default values
 if ~exist('tol','var')
-    tol = 1e-3;
+    tol = 200;
 end
 if ~exist('maxIter','var')
     maxIter = 1000;

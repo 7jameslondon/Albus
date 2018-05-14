@@ -15,10 +15,10 @@ tform = affine2d([  cosd(theta),  sind(theta), 0; ...
 B = transformPointsForward(tform,A);
 
 B = B(randperm(size(B,1)),:);
-B = B + randn(50,2)/5;
+B = B + randn(50,2)/3;
 
 %%
-figure(1)
+figure(3)
 
 [B_affine, flag] = findAffine(A, B, 50, 1e4, 20);
 [A_idx,B_idx] = matchPoints(A, B_affine, 2);
@@ -26,15 +26,19 @@ figure(1)
 A_matching = A(A_idx,:);
 B_matching = B(B_idx,:);
 
-TPS_weights = calculateTPS(A_matching, B_matching, 200);
-B_tps = evaluateTPS(B, TPS_weights, A_matching);
+TPS_weights = calculateTPS(A_matching, B_matching,size(A_matching,1));
+
+B_tps = evaluateTPS(B, TPS_weights, B_matching);
+
 
 plot(A(:,1),A(:,2),'ro');
 hold on;
 plot(B(:,1),B(:,2),'bo');
-plot(B_affine(:,1),B_affine(:,2),'gx');
+plot(B_affine(:,1),B_affine(:,2),'go');
 plot(B_tps(:,1),B_tps(:,2),'r+');
 hold off;
+
+sum(sqrt(sum((B_tps(B_idx,:)-A_matching).^2,2)))
 
 %%
 figure(2)
@@ -47,5 +51,4 @@ Y_tps = reshape(XY_tps(:,2),size(Y,1),size(Y,2));
 Z_tps = sqrt( (X_tps-X).^2 + (Y_tps-Y).^2 );
 
 surf(X_tps,Y_tps,Z_tps)
-
 

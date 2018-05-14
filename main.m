@@ -9,6 +9,7 @@ function main
     addpath([mpath '/Registration']);
     addpath([mpath '/Interface']);
     addpath([mpath '/Tracking']);
+    addpath([mpath '/Detection']);
     
     addpath([mpath '/vbfret']);
     addpath([mpath '/vbfret/src']);
@@ -40,8 +41,12 @@ function main
     %% Load?
     loadOrNew = questdlg('Would you like to load a previous session or start a new session?','Load','Load Session','New Session','New Session');
     if strcmp(loadOrNew,'Load Session')
-        loadSession(handles.f);
-    else
+        cancelFlag = loadSession(handles.f);
+        if cancelFlag
+            delete(handles.f);
+            return;
+        end
+    elseif strcmp(loadOrNew,'New Session')
         %% Auto save
         uiwait(msgbox('Where should this session be saved?','Save'));
         cancelFlag = saveSession(handles.f);
@@ -57,6 +62,10 @@ function main
         handles.tim.TimerFcn = @(~, ~) saveSession(handles.f, 1); % '1' is to flag it as an autosave
         start(handles.tim);
         guidata(handles.f,handles); % save
+        
+    else % cancled
+        delete(handles.f);
+        return;
     end
     
     handles.f.set('Visible', 'on');

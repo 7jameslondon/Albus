@@ -1,8 +1,10 @@
-function loadSession(hObject)
+function flag = loadSession(hObject)
+    flag = false;
     handles = guidata(hObject);
     [loadName, loadPath, ~] = uigetfile({'*.mat'}, 'Select the session to load'); 
     if loadName == 0 % if user presses cancel
-        return
+        flag = true;
+        return;
     end
     hWaitBar = waitbar(0,'Loading in session...', 'WindowStyle', 'modal');
     load([loadPath loadName]);
@@ -52,8 +54,8 @@ function loadSession(hObject)
     setappdata(handles.f,'isMapped',session.isMapped);
     setappdata(handles.f,'kyms',session.kyms);
     setappdata(handles.f,'combinedROIMask',session.combinedROIMask);
-    if isfield(session,'tForm') ~= 0
-        setappdata(handles.f,'tForm',session.tForm);
+    if isfield(session,'displacmentFields') ~= 0
+        setappdata(handles.f,'displacmentFields',session.displacmentFields);
     end
     
     %% Setup video interface

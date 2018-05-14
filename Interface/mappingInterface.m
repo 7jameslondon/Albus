@@ -21,7 +21,7 @@ function handles = createInterface(handles)
                                           	'String', 'Back',...
                                           	'Callback', @(hObject,~) onRelease(hObject,guidata(hObject)));
     
-    %% video or tform                
+    %% video or displacmentFields                
     handles.map.seletVideoPanel = uix.BoxPanel('Parent', handles.map.leftPanel,...
                                                 'Title', 'Select the mapping video',...
                                                 'Padding', 5);
@@ -184,25 +184,14 @@ function handles = createInterface(handles)
     handles.map.particleVBox.set('Heights',[25 15 50 15 50 25 75]);
     
     %% Save
-    handles.map.saveMappingPanel = uix.BoxPanel('Parent', handles.map.leftPanel,...
-                                                'Title', 'Save Mapping',...
-                                                'Visible', 'off',...
-                                                'Padding', 5);
-    handles.map.saveMappingBox = uix.VButtonBox('Parent', handles.map.saveMappingPanel,...
-                                                'ButtonSize', [120 25],...
-                                                'Spacing', 2);
-                                          
-    handles.map.saveMappingDone = uicontrol(  'Parent', handles.map.saveMappingBox,...
+    handles.map.saveMappingPanel = uix.Panel('Parent', handles.map.leftPanel,...
+                                             'Visible', 'off',...
+                                             'Padding', 5);
+    handles.map.saveMappingDone = uicontrol(  'Parent', handles.map.saveMappingPanel,...
                                               'String', 'Done',...
                                            	  'Callback', @(hObject,~) onRelease(hObject, guidata(hObject)));
-    handles.map.saveMappingOnly = uicontrol(  'Parent', handles.map.saveMappingBox,...
-                                              'String', 'Save mapping only',...
-                                           	  'Callback', @(hObject,~) saveSession(hObject, 1));
-    handles.map.saveMappingSession = uicontrol( 'Parent', handles.map.saveMappingBox,...
-                                                'String', 'Save entier session',...
-                                                'Callback', @(hObject,~) saveSession(hObject));
     %%
-    handles.map.leftPanel.set('Heights',[25, 125, 100, 80, 50, 250 110]);
+    handles.map.leftPanel.set('Heights',[25, 125, 100, 80, 50, 250 35]);
     
     setappdata(handles.f,'mapping_currentFrame',1)
 end
@@ -257,6 +246,13 @@ function handles = setControlsForNewVideo(hObject, handles)
 end
 
 function handles = loadFromSession(hObject,handles,session)
+    if strcmp(session.map_mode, 'Loaded Map')
+        handles = setupMultiAxes(hObject,handles,size(session.ROI,1));
+        guidata(hObject,handles);
+        switchMode(hObject, guidata(hObject), session.map_mode);
+        return;
+    end
+
     % particleSettings
     setappdata(handles.f,'mapping_particleSettings',session.map_particleSettings);
         
@@ -264,6 +260,20 @@ function handles = loadFromSession(hObject,handles,session)
     handles = setVideoFile(hObject, handles, session.map_videoFilePath);
     stack = getappdata(handles.f,'data_mapping_originalStack');
     maxIntensity = getappdata(handles.f,'mapping_maxIntensity');
+    if stack==0 % the file could not be located
+        uiwait(msgbox('The original mapping video file could not be found. Please locate the new location of the mapping video and select it.'));
+        
+        [fileName, fileDir, ~] = uigetfile({'*.tif';'*.tiff';'*.TIF';'*.TIFF'}, 'Select the mapping video file'); % prompt user for file
+        if fileName ~= 0 % if user does not presses cancel
+            handles = setVideoFile(hObject, handles, [fileDir fileName]);
+        else
+            handles.map.selectVideoTextBox.String = session.map_videoFilePath;
+            delete(handles.f);
+        end
+        stack = getappdata(handles.f,'data_mapping_originalStack');
+        maxIntensity = getappdata(handles.f,'mapping_maxIntensity');
+    end
+    
     
     % frame controls
     % set max before values
@@ -310,6 +320,49 @@ function handles = setVideoFile(hObject, handles, filePath)
     setappdata(handles.f,'mapping_maxIntensity',maxIntensity);
     
     close(hWaitBar);
+end
+
+function loadPreviousMapping(hObject)
+    [fileName, fileDir, ~] = uigetfile({'*.mat'}, 'Select a mapped session file'); % prompt user for file
+    if fileName == 0 % the user canceled
+        return;
+    end
+    
+    hWaitBar = waitbar(0,'Loading in mapping...', 'WindowStyle', 'modal');
+    session = load([fileDir fileName]);
+    session = session.session;
+    
+    if ~session.isMapped % contains no mapping
+        msgbox('This file does not contain a mapping!');
+        delete(hWaitBar);
+        return;
+    end
+    
+    % import mapping
+    handles = guidata(hObject);
+    setappdata(handles.f,'isMapped',session.isMapped);
+    setappdata(handles.f,'displacmentFields',session.displacmentFields);
+    setappdata(handles.f,'combinedROIMask',session.combinedROIMask);
+    setappdata(handles.f,'ROI',session.ROI);
+    
+    % apply mapping
+    if ~strcmp(handles.vid.selectVideoTextBox.String, 'No video selected')
+        collocalizeVideo(hObject,handles);
+    end
+    if handles.dna.sourcePopUpMenu.Value ~= 1
+        collocalizeDNAImport(hObject,handles);
+    end
+    if handles.fret.sourcePopUpMenu.Value ~=1
+        collocalizeFRETImport(hObject,handles);
+    end
+    
+    % setup display
+    handles = setupMultiAxes(hObject,handles,size(session.ROI,1));
+    guidata(hObject,handles);
+    switchMode(hObject, handles, 'Loaded Map');
+    msgbox('Mapping Loaded!');
+    
+    delete(hWaitBar);
 end
 
 %% ROI Controls
@@ -404,7 +457,34 @@ function roiSelected(hObject, handles)
     handles.map.particleChannel.String = channelStr;
 
     %% Setup seperate chanels axes
-    % delete old multiAxes if they exist
+    handles = setupMultiAxes(hObject,handles,numROI);
+
+    %% Seperate Stacks
+    ROI = getappdata(handles.f,'ROI');
+    stack = getappdata(handles.f,'data_mapping_originalStack');
+    seperatedStacks = seperateStack(ROI,stack);
+    
+    %% Remove imrects
+    if isfield(handles,'roiRect')
+        for i=1:numROI
+            delete(handles.roiRect{1});
+            handles.roiRect(1)=[];
+        end
+        handles = rmfield(handles,'roiRect');
+    end
+    
+    %% Save then Display
+    setappdata(handles.f,'data_mapping_originalSeperatedStacks',seperatedStacks);
+    guidata(hObject,handles);
+    particleDetectionChangeChannel(hObject,handles);
+    switchMode(hObject, handles, 'Particles');
+    updateParticleDetection(hObject);
+    handles.multiAxes.AxesAPI{1}.setMagnification(handles.multiAxes.AxesAPI{1}.findFitMag()); % zoom axes
+    close(hWaitBar);
+end
+
+function handles = setupMultiAxes(hObject,handles,numROI)
+% delete old multiAxes if they exist
     if isfield(handles,'multiAxes')
         delete(handles.multiAxes.Grid);
     end
@@ -461,29 +541,6 @@ function roiSelected(hObject, handles)
     % magnification box
     magBoxPos = get(handles.multiAxes.magBox,'Position');
     set(handles.multiAxes.magBox,'Position',[0 0 magBoxPos(3) magBoxPos(4)]);
-
-    %% Seperate Stacks
-    ROI = getappdata(handles.f,'ROI');
-    stack = getappdata(handles.f,'data_mapping_originalStack');
-    seperatedStacks = seperateStack(ROI,stack);
-    
-    %% Remove imrects
-    if isfield(handles,'roiRect')
-        for i=1:numROI
-            delete(handles.roiRect{1});
-            handles.roiRect(1)=[];
-        end
-        handles = rmfield(handles,'roiRect');
-    end
-    
-    %% Save then Display
-    setappdata(handles.f,'data_mapping_originalSeperatedStacks',seperatedStacks);
-    guidata(hObject,handles);
-    particleDetectionChangeChannel(hObject,handles);
-    switchMode(hObject, handles, 'Particles');
-    updateParticleDetection(hObject);
-    handles.multiAxes.AxesAPI{1}.setMagnification(handles.multiAxes.AxesAPI{1}.findFitMag()); % zoom axes
-    close(hWaitBar);
 end
 
 %% Brightness Callbacks
@@ -722,6 +779,9 @@ function switchMode(hObject, handles, value)
             handles.map.saveMappingPanel.Visible = 'on';
             handles.axesControl.currentFramePanel.Visible = 'on';
             switchDisplayAxes(hObject, 1);
+        case 'Loaded Map'
+            handles.map.selectVideoTextBox.String = 'Mapping loaded from a session.';
+            switchDisplayAxes(hObject, 1);
     end
 end
 
@@ -746,23 +806,28 @@ function onRelease(hObject,handles)
     setappdata(handles.f,'mapping_currentFrame', get(handles.axesControl.currentFrame.JavaPeer,'Value'));
     
     %
-    if isappdata(handles.f,'tForm')
+    if isappdata(handles.f,'displacmentFields')
         if ~strcmp(handles.vid.selectVideoTextBox.String, 'No video selected')
             collocalizeVideo(hObject,handles);
         end
-        if ~strcmp(handles.dna.importVideoTextbox.String, 'No video selected')
+        if handles.dna.sourcePopUpMenu.Value ~= 1
             collocalizeDNAImport(hObject,handles);
         end
-        
-        % remove particle plots
-        for i=1:size(handles.multiAxes.plt,1)
-            % remove particle plots
-            for p = 1:size(handles.multiAxes.plt{i},1)
-                delete(handles.multiAxes.plt{i}{1})
-                handles.multiAxes.plt{i}(1) = [];
-            end
+        if handles.fret.sourcePopUpMenu.Value ~=1
+            collocalizeFRETImport(hObject,handles);
         end
-        guidata(hObject,handles);
+        
+        if isfield(handles,'multiAxes')
+            % remove particle plots
+            for i=1:size(handles.multiAxes.plt,1)
+                % remove particle plots
+                for p = 1:size(handles.multiAxes.plt{i},1)
+                    delete(handles.multiAxes.plt{i}{1})
+                    handles.multiAxes.plt{i}(1) = [];
+                end
+            end
+            guidata(hObject,handles);
+        end
     end
     
     homeInterface('openHome',hObject);
@@ -779,66 +844,8 @@ end
 %% Registration
 function registerMapping(hObject,handles)
     setappdata(handles.f,'isMapped',1);
-    generateTForm(hObject,handles);
+    generateRegistration(hObject,handles);
     collocalizeMapping(hObject,handles);
-end
-
-function generateTForm(hObject,handles)
-    hWaitBar = waitbar(0,'Generating map ...', 'WindowStyle', 'modal');
-    
-    seperatedStacks = getappdata(handles.f,'data_mapping_originalSeperatedStacks');
-    particleSettings = getappdata(handles.f,'mapping_particleSettings');
-    currentFrame = get(handles.axesControl.currentFrame.JavaPeer,'Value');
-    colors = getappdata(handles.f,'colors');
-    invertImage = handles.map.invertCheckbox.Value;
-    numChannels = size(seperatedStacks,1);
-                
-    % Find particles in each sperated stack
-    particlesByStack = cell(numChannels,1);
-    for s = 1:numChannels % no parfor as findParticles has parfor
-        I = seperatedStacks{s}(:,:,currentFrame);
-        % invert
-        if invertImage
-            I = imcomplement(I);
-        end
-        % this will  filter and adjust brightness as needed
-        particles = findParticles(I, particleSettings(s).minIntensity, particleSettings(s).maxIntensity, particleSettings(s).filterSize, 'Method', 'GaussianFit');
-        particlesByStack{s} = particles{1}; % just one frame of particles
-    end
-    waitbar(1/10);
-
-    % Find approximatly colocalized particles
-    approximatelyCorrectedParticles = arrayfun( ...
-        @(i) approximatelyCorrectParticles( particlesByStack{1}.Center, particlesByStack{i}.Center, 0.05, 0.8, 2, hWaitBar ), ...
-        (2:numChannels) , 'UniformOutput' , false );
-    
-    waitbar(4/10);
-    
-    % Use the approximatly colocalized particles to find the perfect match
-    colocalizedIndexes = arrayfun( ...
-        @(i) particleColocalization(particlesByStack{1}.Center, approximatelyCorrectedParticles{i-1}, 2), ...
-        (2:numChannels) , 'UniformOutput' , false );
-    waitbar(8/10);
-
-    % Create the tForm
-    tForm = arrayfun( ...
-        @(i) fitgeotrans(particlesByStack{i}.Center(colocalizedIndexes{i-1}.indexB,1:2), particlesByStack{1}.Center(colocalizedIndexes{i-1}.indexA,1:2),'projective'), ...
-        (2:numChannels) , 'UniformOutput' , false );
-    
-    % Create combinedROIMask
-    ROIofOnes = ones(size(seperatedStacks{s}(:,:,currentFrame)));
-    combinedROIMask = ROIofOnes;
-    for i=2:numChannels
-        combinedROIMask = combinedROIMask .* imwarp(ROIofOnes, tForm{i-1}, 'OutputView', imref2d(size(ROIofOnes)));
-    end
-    combinedROIMask = logical(combinedROIMask);
-    
-    %% Save data
-    setappdata(handles.f,'tForm',tForm);
-    setappdata(handles.f,'combinedROIMask',combinedROIMask);
-    
-    waitbar(10/10);
-    delete(hWaitBar);
 end
 
 function collocalizeMapping(hObject,handles)
@@ -847,7 +854,7 @@ function collocalizeMapping(hObject,handles)
     seperatedStacks = getappdata(handles.f,'data_mapping_originalSeperatedStacks');
     invertImage = handles.map.invertCheckbox.Value;
     numChannels = size(seperatedStacks,1);
-    tForm = getappdata(handles.f,'tForm');
+    displacmentFields = getappdata(handles.f,'displacmentFields');
     
     % Get adjusted seperatedStacks
     for s = 1:numChannels
@@ -866,7 +873,7 @@ function collocalizeMapping(hObject,handles)
     % Collocalize stacks
     collocalisedSeperatedStacks = seperatedStacks;
     collocalisedSeperatedStacks(2:end) = arrayfun( ...
-        @(i) colocalizeStack(seperatedStacks{i}, tForm{i-1}, imref2d(size(seperatedStacks{1}(:,:,1)))), ...
+        @(i) colocalizeStack(seperatedStacks{i}, displacmentFields{i}), ...
         (2:numChannels) , 'UniformOutput' , false );
     setappdata(handles.f,'data_mapping_collocalisedSeperatedStacks',collocalisedSeperatedStacks);
     
@@ -883,7 +890,7 @@ function collocalizeVideo(hObject,handles)
     stack = getappdata(handles.f,'data_video_originalStack');
     invertImage = handles.vid.invertCheckbox.Value;
     numChannels = size(ROI,1);
-    tForm = getappdata(handles.f,'tForm');
+    displacmentFields = getappdata(handles.f,'displacmentFields');
     startCut = handles.vid.cutting.JavaPeer.get('LowValue');
     endCut = handles.vid.cutting.JavaPeer.get('HighValue');
     combinedROIMask = getappdata(handles.f,'combinedROIMask');
@@ -894,7 +901,7 @@ function collocalizeVideo(hObject,handles)
     % Collocalize stacks
     collocalisedSeperatedStacks = seperatedStacks;
     collocalisedSeperatedStacks(2:end) = arrayfun( ...
-        @(i) colocalizeStack(seperatedStacks{i}, tForm{i-1}, imref2d(size(seperatedStacks{1}(:,:,1)))), ...
+        @(i) colocalizeStack(seperatedStacks{i}, displacmentFields{i}), ...
         (2:numChannels) , 'UniformOutput' , false );
     
     %% Get adjusted seperatedStacks
@@ -937,7 +944,7 @@ function collocalizeDNAImport(hObject,handles)
             
             ROI = getappdata(handles.f,'ROI');
             numChannels = size(ROI,1);
-            tForm = getappdata(handles.f,'tForm');
+            displacmentFields = getappdata(handles.f,'displacmentFields');
 
             %% Seperate Stacks
             seperatedStacks = seperateStack(ROI,stack);
@@ -945,7 +952,7 @@ function collocalizeDNAImport(hObject,handles)
             % Collocalize stacks
             collocalisedSeperatedStacks = seperatedStacks;
             collocalisedSeperatedStacks(2:end) = arrayfun( ...
-                @(i) colocalizeStack(seperatedStacks{i}, tForm{i-1}, imref2d(size(seperatedStacks{1}(:,:,1)))), ...
+                @(i) colocalizeStack(seperatedStacks{i}, displacmentFields{i}), ...
                 (2:numChannels) , 'UniformOutput' , false );
     end
     
@@ -968,7 +975,7 @@ function collocalizeFRETImport(hObject,handles)
             
             ROI = getappdata(handles.f,'ROI');
             numChannels = size(ROI,1);
-            tForm = getappdata(handles.f,'tForm');
+            displacmentFields = getappdata(handles.f,'displacmentFields');
 
             %% Seperate Stacks
             seperatedStacks = seperateStack(ROI,stack);
@@ -976,7 +983,7 @@ function collocalizeFRETImport(hObject,handles)
             % Collocalize stacks
             collocalisedSeperatedStacks = seperatedStacks;
             collocalisedSeperatedStacks(2:end) = arrayfun( ...
-                @(i) colocalizeStack(seperatedStacks{i}, tForm{i-1}, imref2d(size(seperatedStacks{1}(:,:,1)))), ...
+                @(i) colocalizeStack(seperatedStacks{i}, displacmentFields{i}), ...
                 (2:numChannels) , 'UniformOutput' , false );
     end
     

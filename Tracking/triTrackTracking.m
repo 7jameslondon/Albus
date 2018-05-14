@@ -14,7 +14,7 @@ function tracks = triTrackTracking( particlesByFrame, maxMovment )
     tracksIdx = zeros(0,numFrames);
     
     %% Find track indexs
-    for f = 2:numFrames-1
+    for f = 2:numFrames-1        
         prevParticles = particlesByFrame{f-1};
         currParticles = particlesByFrame{f};
         nextParticles = particlesByFrame{f+1};

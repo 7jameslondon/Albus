@@ -1,4 +1,5 @@
 function best_x_hat = vbFRETWrapper(fret, kmin, K)
+    warning('off', 'MATLAB:singularMatrix');
     % kmin - set minimum number of states to try fitting
     % K - set maximum number of states to try fitting
 
@@ -8,13 +9,13 @@ function best_x_hat = vbFRETWrapper(fret, kmin, K)
     I = 10;
     
     % analyzeFRET program settings
-    PriorPar.upi = 1;
+    PriorPar.upi = 1.;
     PriorPar.mu = .5*ones(D,1);
     PriorPar.beta = 0.25;
     PriorPar.W = 50*eye(D);
     PriorPar.v = 5.0;
     PriorPar.ua = 1.0;
-    PriorPar.uad = 0;
+    PriorPar.uad = 0.;
     %PriorPar.Wa_init = true;
 
     % set the vb_opts for VBEM
@@ -83,4 +84,6 @@ function best_x_hat = vbFRETWrapper(fret, kmin, K)
 
     % Get idealized data fits
     [best_z_hat, best_x_hat] = chmmViterbi(bestOut{1,best_k},fret);
+    
+    warning('on', 'MATLAB:singularMatrix');
 end

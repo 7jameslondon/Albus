@@ -31,7 +31,6 @@ hold off;
 
 %% GRAPH THEORY
 maxDist = 5;
-
 tracks = triTrackTracking( positions, maxDist );
 
 %% PLOT the FOUND TRACKS
