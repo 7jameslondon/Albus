@@ -15,6 +15,8 @@ function main
     addpath([mpath '/vbfret/src']);
     addpath([mpath '/vbfret/ext_src']);
     
+    addpath([mpath '/parfor_progress']);
+    
     addpath([mpath '/GUI_Layout_Toolbox_2/layout/']);
 
     %% Interface
@@ -22,8 +24,11 @@ function main
 
     %% Inialize settings
     colors = [[1 0 0]; [0 1 0]; [0 0 1]; [0 1 1]; [1 1 0]; [1 0 1]];
+    names  = [{'Channel 1'}, {'Channel 2'}, {'Channel 3'}, {'Channel 4'}, {'Channel 5'}, {'Channel 6'}];
     setappdata(handles.f,'colors',colors);
+    setappdata(handles.f,'ROINames',names);
     setappdata(handles.f,'ROI',[]);
+    setappdata(handles.f,'drift',[]);
     setappdata(handles.f,'mode','Home');
     setappdata(handles.f,'isMapped',0);
 

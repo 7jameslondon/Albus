@@ -4,21 +4,24 @@ figure(1)
 
 [fPath1 fPath2] = uigetfile('*.tif');
 fPath = [fPath2 fPath1];
-%%
+%% Create DNA
 figure(2)
 
-padSize = 2;
-
-obj = strel('line',20,0);
+padSize = 2; % width
+obj = strel('line',20,0); % length
 obj = obj.Neighborhood;
 obj = padarray(obj,padSize);
 obj = padarray(obj',padSize)';
 obj = imgaussfilt(double(obj),1);
 obj = im2uint16(obj);
+
+obj = imrotate(obj, 0);
+
+%
 imshow(obj);
 %%
 I = imread(fPath);
-%I = I(1:size(I,1),200:size(I,2));
+I = I(1:size(I,1),200:size(I,2));
 
 I = adapthisteq(I,'Distribution','rayleigh','ClipLimit',0.005);
 
@@ -75,3 +78,7 @@ end
     
         rectangle(ax,'Position',rects(i,:),'EdgeColor','c');
     end 
+    
+    
+    
+    

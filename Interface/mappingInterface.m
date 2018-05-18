@@ -76,7 +76,7 @@ function handles = createInterface(handles)
     handles.map.brightness.JavaPeer.set('MajorTickSpacing',1e5);
     handles.map.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.map.brightness));
     
-    % box for auto and invert
+    % box for auto, invert and time average
     handles.map.autoAndInvertHBox = uix.HBox('Parent', handles.map.preProcVBox);
     
     % invert
@@ -89,6 +89,12 @@ function handles = createInterface(handles)
     handles.map.autoBrightnessButton = uicontrol(  'Parent', handles.map.autoAndInvertHBox,...
                                                 'String', 'Auto Brightness',...
                                                 'Callback', @(hObject,~) autoBrightness(hObject, guidata(hObject)));
+                                            
+    % time average
+    handles.map.timeAvgCheckbox = uicontrol(     'Parent', handles.map.autoAndInvertHBox,...
+                                                'Style', 'checkbox',...
+                                                'String', 'Time Average',...
+                                                'Callback', @(hObject,~) setTimeAverageVideo(hObject, guidata(hObject),hObject.Value));
     
     %% ROI
     setappdata(handles.f,'selectingROI', false);
@@ -235,6 +241,9 @@ function handles = setControlsForNewVideo(hObject, handles)
     % invert
     handles.map.invertCheckbox.Value   = 0;
     
+    % time avg
+    handles.map.timeAvgCheckbox.Value   = 0;
+    
     % ROI
     handles.map.numberROITextBox.Value = 1;
     
@@ -292,6 +301,9 @@ function handles = loadFromSession(hObject,handles,session)
     % invert
     handles.map.invertCheckbox.Value = session.map_invertVideo;
     
+    % time avg
+    handles.map.timeAvgCheckbox.Value   = session.map_timeAvg;
+    
     % ROI
     handles.map.numberROITextBox.Value = session.map_numberROI;
     roiSelected(hObject, handles);
@@ -302,6 +314,7 @@ function handles = loadFromSession(hObject,handles,session)
     % overlay
     if strcmp(session.map_mode,'Overlay')
         collocalizeMapping(hObject, guidata(hObject));
+        switchMode(hObject, handles, 'Overlay');
     else
         switchMode(hObject, guidata(hObject), session.map_mode);
     end
@@ -489,6 +502,9 @@ function handles = setupMultiAxes(hObject,handles,numROI)
         delete(handles.multiAxes.Grid);
     end
     
+    colors = getappdata(handles.f,'colors');
+    names  = getappdata(handles.f,'ROINames');
+    
     handles.multiAxes = struct();
     handles.multiAxes.plt = cell(numROI,1);
     handles.multiAxes.Grid = uix.Grid(  'Parent', handles.axesPanel,...
@@ -497,12 +513,23 @@ function handles = setupMultiAxes(hObject,handles,numROI)
 
     handles.multiAxes.Axes = cell(numROI,1);
     for i=1:numROI
-        % title (ex. "Channel 1")
-        uicontrol(  'Parent', handles.multiAxes.Grid,...
-                    'Style', 'text',...
-                    'String', ['Channel ' num2str(i)],...
-                    'FontSize', 14,...
-                    'FontWeight', 'bold');
+        % box containing title and edit button
+        handles.multiAxes.titleBox{i} = uix.HBox(   'Parent', handles.multiAxes.Grid,...
+                                                    'Padding', 0,...
+                                                    'Spacing', 0);
+        % title
+        handles.multiAxes.titleText{i} = uicontrol( 'Parent', handles.multiAxes.titleBox{i},...
+                                                    'Style', 'text',...
+                                                    'String', names{i},...
+                                                    'FontSize', 14,...
+                                                    'FontWeight', 'bold');
+        % edit button
+        handles.multiAxes.editBox{i} = uix.HButtonBox('Parent', handles.multiAxes.titleBox{i}, 'ButtonSize', [60, 25]);
+        handles.multiAxes.editButton{i} = uicontrol('Parent', handles.multiAxes.editBox{i},...
+                                                    'Style', 'pushbutton',...
+                                                    'String', 'edit',...
+                                                    'BackgroundColor', colors(i,:),...
+                                                    'Callback', @(hObject,~) editMultiAxesCallback(hObject, guidata(hObject), i));
         % panel
         handles.multiAxes.Panel{i} = uipanel('Parent', handles.multiAxes.Grid,...
                                              'BorderType', 'none');
@@ -543,6 +570,63 @@ function handles = setupMultiAxes(hObject,handles,numROI)
     set(handles.multiAxes.magBox,'Position',[0 0 magBoxPos(3) magBoxPos(4)]);
 end
 
+function editMultiAxesCallback(hObject, handles, id)
+    colors = getappdata(handles.f,'colors');
+    names  = getappdata(handles.f,'ROINames');
+
+    % Window
+    dialogWindow = dialog('Position',[300 300 250 100],'Name','Editing Channel', 'DeleteFcn', @(~,~) onClose);
+    dialogBox    = uix.VBox('Parent', dialogWindow, 'Padding', 10, 'Spacing', 10);
+    
+    % Names Box
+    nameBox = uix.HBox('Parent', dialogBox);
+    % Name Text
+    uicontrol('Parent',nameBox,...
+           'Style','text',...
+           'String','Channel Name: ');
+    % Name Input
+    nameInput = uicontrol('Parent',nameBox,...
+           'Style','edit',...
+           'String', names{id});
+       
+    % Color Button
+    colorBox = uix.HButtonBox('Parent', dialogBox, 'ButtonSize', [100, 25]);
+    colorButton = uicontrol('Parent',colorBox,...
+                            'Position',[89 20 70 25],...
+                            'String','Change Color',...
+                            'BackgroundColor', colors(id,:),...
+                            'Callback',@(~,~) colorCallback);
+       
+    % Close
+    uicontrol(  'Parent',dialogBox,...
+                'String','Close',...
+                'Callback', @(~,~) delete(dialogWindow));
+       
+    dialogBox.set('Heights', [20, 25, 25]);
+              
+    % Wait for d to close before running to completion
+    uiwait(dialogWindow); 
+    
+    
+   function colorCallback()
+      color = uisetcolor(colors(id,:));
+      colors(id,:) = color;
+      colorButton.BackgroundColor = color;
+      setappdata(handles.f,'colors',colors);
+   end    
+
+    function onClose()
+        % save text (color is already saved)
+        names{id} = nameInput.String;
+        setappdata(handles.f,'ROINames',names);
+        
+        % update display
+        handles.multiAxes.titleText{id}.String = nameInput.String;
+        handles.multiAxes.editButton{id}.BackgroundColor = colors(id,:);
+        updateParticleDetection(hObject);
+    end
+end
+
 %% Brightness Callbacks
 function setBrightness(hObject)
     handles = guidata(hObject);
@@ -560,19 +644,31 @@ function setBrightness(hObject)
 end
 
 function autoBrightness(hObject, handles)    
-    stack = getappdata(handles.f,'data_mapping_originalStack');
+    stack       = getappdata(handles.f,'data_mapping_originalStack');
     curretFrame = get(handles.axesControl.currentFrame.JavaPeer,'Value');
-    I = stack(:,:,curretFrame);
+    timeAvg     = handles.map.timeAvgCheckbox.Value;
+
+    % get frame
+    if timeAvg
+        I = timeAvgStack(stack);
+    else
+        I = stack(:,:,curretFrame);
+    end
+
+    % invert
     if handles.map.invertCheckbox.Value
         I = imcomplement(I);
     end
+
+    % auto brightness
     autoImAdjust = stretchlim(I);
-    
     autoImAdjust = round(autoImAdjust * get(handles.map.brightness.JavaPeer,'Maximum'));
-    
+
+    % set slider values
     set(handles.map.brightness.JavaPeer,'LowValue',autoImAdjust(1));
     set(handles.map.brightness.JavaPeer,'HighValue',autoImAdjust(2));
-
+    
+    % display autoed image
     updateDisplay(hObject,handles);
 end
 
@@ -590,6 +686,19 @@ function setCurrentFrame(hObject, value)
     updateDisplay(hObject,handles);
 end
 
+function setTimeAverageVideo(hObject, handles, value)
+
+    handles.map.timeAvgCheckbox.Value = value;
+    if value
+        handles.axesControl.currentFramePanel.Visible = 'off';
+    else
+        handles.axesControl.currentFramePanel.Visible = 'on';
+    end
+    
+    % this will call updateDisplay
+    autoBrightness(hObject, handles);
+end
+
 %% Update Display
 function updateDisplay(hObject,handles,particleFlag) 
     if ~exist('handles','var')
@@ -597,13 +706,14 @@ function updateDisplay(hObject,handles,particleFlag)
     end
     
     % get values
-    curretFrame = get(handles.axesControl.currentFrame.JavaPeer,'Value');
-    lowBrightness = get(handles.map.brightness.JavaPeer,'LowValue')/get(handles.map.brightness.JavaPeer,'Maximum');
-    highBrightness = get(handles.map.brightness.JavaPeer,'HighValue')/get(handles.map.brightness.JavaPeer,'Maximum');
-    invertImage = handles.map.invertCheckbox.Value;
-    colors = getappdata(handles.f,'colors');
+    curretFrame     = get(handles.axesControl.currentFrame.JavaPeer,'Value');
+    lowBrightness   = get(handles.map.brightness.JavaPeer,'LowValue')/get(handles.map.brightness.JavaPeer,'Maximum');
+    highBrightness  = get(handles.map.brightness.JavaPeer,'HighValue')/get(handles.map.brightness.JavaPeer,'Maximum');
+    invertImage     = handles.map.invertCheckbox.Value;
+    timeAvg         = handles.map.timeAvgCheckbox.Value;
+    colors          = getappdata(handles.f,'colors');
     combinedROIMask = getappdata(handles.f,'combinedROIMask');
-    
+
     if strcmp(getappdata(handles.f,'mapping_mode'),'Overlay')
         % Display overalped stacks
         collocalisedSeperatedStacks = getappdata(handles.f,'data_mapping_collocalisedSeperatedStacks');
@@ -627,13 +737,20 @@ function updateDisplay(hObject,handles,particleFlag)
         stack = getappdata(handles.f,'data_mapping_originalStack');
         
         % current frame
-        I = stack(:,:,curretFrame);
+        if timeAvg
+            I = timeAvgStack(stack);
+        else
+            I = stack(:,:,curretFrame);
+        end
+        
         % invert
         if invertImage
             I = imcomplement(I);
         end
+        
         % brightness
         I = imadjust(I, [lowBrightness highBrightness]);
+        
         % display
         handles.oneAxes.AxesAPI.replaceImage(I,'PreserveView',true);
     elseif handles.axesPanel.Selection == 2
@@ -642,7 +759,12 @@ function updateDisplay(hObject,handles,particleFlag)
         
         for i=1:length(seperatedStacks)
             % current frame
-            I = seperatedStacks{i}(:,:,curretFrame);
+            if timeAvg
+                I = timeAvgStack(seperatedStacks{i});
+            else
+                I = seperatedStacks{i}(:,:,curretFrame);
+            end
+            
             % invert
             if invertImage
                 I = imcomplement(I);
@@ -669,8 +791,10 @@ function updateDisplay(hObject,handles,particleFlag)
                 I = imadjust(I);
                 handles.multiAxes.AxesAPI{i}.replaceImage(I,'PreserveView',true);
                 
+                
                 particles = findParticles(I, particleMinInt, particleMaxInt);
                 centers = particles{1};
+                
                 
                 % display particles found
                 handles.multiAxes.plt{i} = cell(size(centers,1));
@@ -688,6 +812,8 @@ function updateDisplay(hObject,handles,particleFlag)
 end
 
 function updateParticleDetection(hObject)
+    hWaitBar = waitbar(0,'loading ...', 'WindowStyle', 'modal');
+    
     handles = guidata(hObject);
     particleSettings = getappdata(handles.f,'mapping_particleSettings');
     numChannels = size(particleSettings,2);
@@ -707,6 +833,8 @@ function updateParticleDetection(hObject)
     setappdata(handles.f,'mapping_particleSettings',particleSettings); % save
     
     updateDisplay(hObject,handles,1); % parameter '1' added to add particles
+    
+    delete(hWaitBar);
 end
 
 function particleDetectionChangeChannel(hObject,handles)
@@ -740,7 +868,10 @@ function switchDisplayAxes(hObject, value)
     end
     
     handles.axesPanel.Selection = value;
-    updateDisplay(hObject,handles);
+    
+    if ~strcmp(getappdata(handles.f,'mapping_mode'),'Loaded Map')
+        updateDisplay(hObject,handles);
+    end
 end
 
 function switchMode(hObject, handles, value)
@@ -762,10 +893,15 @@ function switchMode(hObject, handles, value)
             handles.rightPanel.Visible = 'on';
             handles.map.preProcPanel.Visible = 'on';
             handles.map.roiPanel.Visible = 'on';
-            handles.axesControl.currentFramePanel.Visible = 'on';
             switchDisplayAxes(hObject, 1);
             updateDisplay(hObject,handles);
             handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag()); % zoom axes
+                
+            if handles.map.timeAvgCheckbox.Value
+                handles.axesControl.currentFramePanel.Visible = 'off';
+            else
+                handles.axesControl.currentFramePanel.Visible = 'on';
+            end
         case 'Particles'
             handles.rightPanel.Visible = 'on';
             handles.map.changeROIPanel.Visible = 'on';
@@ -846,152 +982,7 @@ function registerMapping(hObject,handles)
     setappdata(handles.f,'isMapped',1);
     generateRegistration(hObject,handles);
     collocalizeMapping(hObject,handles);
-end
-
-function collocalizeMapping(hObject,handles)
-    hWaitBar = waitbar(0,'Collocalizing mapping video ...', 'WindowStyle', 'modal');
-    
-    seperatedStacks = getappdata(handles.f,'data_mapping_originalSeperatedStacks');
-    invertImage = handles.map.invertCheckbox.Value;
-    numChannels = size(seperatedStacks,1);
-    displacmentFields = getappdata(handles.f,'displacmentFields');
-    
-    % Get adjusted seperatedStacks
-    for s = 1:numChannels
-        for f = 1:size(seperatedStacks{s},3)
-            I = seperatedStacks{s}(:,:,f);
-            % invert
-            if invertImage
-                I = imcomplement(I);
-            end
-            % brightness
-            seperatedStacks{s}(:,:,f) = imadjust(I);
-        end
-    end
-    waitbar(1/10);
-    
-    % Collocalize stacks
-    collocalisedSeperatedStacks = seperatedStacks;
-    collocalisedSeperatedStacks(2:end) = arrayfun( ...
-        @(i) colocalizeStack(seperatedStacks{i}, displacmentFields{i}), ...
-        (2:numChannels) , 'UniformOutput' , false );
-    setappdata(handles.f,'data_mapping_collocalisedSeperatedStacks',collocalisedSeperatedStacks);
-    
     switchMode(hObject, handles, 'Overlay');
-    
-    waitbar(10/10);
-    delete(hWaitBar);
-end
-
-function collocalizeVideo(hObject,handles)
-    hWaitBar = waitbar(0,'Collocalizing video ...', 'WindowStyle', 'modal');
-    
-    ROI = getappdata(handles.f,'ROI');
-    stack = getappdata(handles.f,'data_video_originalStack');
-    invertImage = handles.vid.invertCheckbox.Value;
-    numChannels = size(ROI,1);
-    displacmentFields = getappdata(handles.f,'displacmentFields');
-    startCut = handles.vid.cutting.JavaPeer.get('LowValue');
-    endCut = handles.vid.cutting.JavaPeer.get('HighValue');
-    combinedROIMask = getappdata(handles.f,'combinedROIMask');
-    
-    %% Seperate Stacks
-    seperatedStacks = seperateStack(ROI,stack);
-    
-    % Collocalize stacks
-    collocalisedSeperatedStacks = seperatedStacks;
-    collocalisedSeperatedStacks(2:end) = arrayfun( ...
-        @(i) colocalizeStack(seperatedStacks{i}, displacmentFields{i}), ...
-        (2:numChannels) , 'UniformOutput' , false );
-    
-    %% Get adjusted seperatedStacks
-    seperatedStacks = collocalisedSeperatedStacks;
-    treatedSeperatedStacks = collocalisedSeperatedStacks;
-    for s = 1:numChannels
-        for f = startCut:endCut
-            I = seperatedStacks{s}(:,:,f);
-            % invert
-            if invertImage
-                I = imcomplement(I);
-            end
-            % mask
-            I(~combinedROIMask) = 0;
-            seperatedStacks{s}(:,:,f) = I;
-            % brightness
-            I(combinedROIMask) = imadjust(I(combinedROIMask));
-            treatedSeperatedStacks{s}(:,:,f) = I;
-        end
-    end
-    
-    % save
-    setappdata(handles.f,'data_video_originalSeperatedStacks', collocalisedSeperatedStacks);
-    setappdata(handles.f,'data_video_seperatedStacks', seperatedStacks);
-    setappdata(handles.f,'data_video_treatedSeperatedStacks', treatedSeperatedStacks);
-    
-    waitbar(10/10);
-    delete(hWaitBar);
-end
-
-function collocalizeDNAImport(hObject,handles)
-    hWaitBar = waitbar(0,'Collocalizing DNA video ...', 'WindowStyle', 'modal');
-    
-    switch handles.dna.sourcePopUpMenu.Value
-        case 2 % Current vid
-            collocalisedSeperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
-
-        case 3 % Import
-            stack = getappdata(handles.f,'data_dnaImport_originalStack');
-            
-            ROI = getappdata(handles.f,'ROI');
-            numChannels = size(ROI,1);
-            displacmentFields = getappdata(handles.f,'displacmentFields');
-
-            %% Seperate Stacks
-            seperatedStacks = seperateStack(ROI,stack);
-
-            % Collocalize stacks
-            collocalisedSeperatedStacks = seperatedStacks;
-            collocalisedSeperatedStacks(2:end) = arrayfun( ...
-                @(i) colocalizeStack(seperatedStacks{i}, displacmentFields{i}), ...
-                (2:numChannels) , 'UniformOutput' , false );
-    end
-    
-    % save
-    setappdata(handles.f,'data_dnaImport_seperatedStacks', collocalisedSeperatedStacks);
-    
-    waitbar(10/10);
-    delete(hWaitBar);
-end
-
-function collocalizeFRETImport(hObject,handles)
-    hWaitBar = waitbar(0,'Collocalizing FRET video ...', 'WindowStyle', 'modal');
-    
-    switch handles.fret.sourcePopUpMenu.Value
-        case 2 % Current vid
-            collocalisedSeperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
-
-        case 3 % Import
-            stack = getappdata(handles.f,'data_fretImport_originalStack');
-            
-            ROI = getappdata(handles.f,'ROI');
-            numChannels = size(ROI,1);
-            displacmentFields = getappdata(handles.f,'displacmentFields');
-
-            %% Seperate Stacks
-            seperatedStacks = seperateStack(ROI,stack);
-
-            % Collocalize stacks
-            collocalisedSeperatedStacks = seperatedStacks;
-            collocalisedSeperatedStacks(2:end) = arrayfun( ...
-                @(i) colocalizeStack(seperatedStacks{i}, displacmentFields{i}), ...
-                (2:numChannels) , 'UniformOutput' , false );
-    end
-    
-    % save
-    setappdata(handles.f,'data_fretImport_seperatedStacks', collocalisedSeperatedStacks);
-    
-    waitbar(10/10);
-    delete(hWaitBar);
 end
 
 %% Play/pause

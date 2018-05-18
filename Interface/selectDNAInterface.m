@@ -249,7 +249,7 @@ function handles = loadFromSession(hObject,handles,session)
         pauseVideo(hObject,handles);
     end
     
-    % deactivate manule mode if its on
+    % deactivate manual mode if its on
     deactivateManualMode(hObject, handles);
     
     % source
@@ -258,11 +258,8 @@ function handles = loadFromSession(hObject,handles,session)
     % channel
     if isappdata(handles.f,'data_video_originalSeperatedStacks')
         numChannels = size(getappdata(handles.f,'data_video_originalSeperatedStacks'),1);
-        str = cell(numChannels,1);
-        for i=1:numChannels
-            str{i} = num2str(i);
-        end
-        handles.dna.sourceChannelPopUpMenu.String = str;
+        names = getappdata(handles.f,'ROINames');
+        handles.dna.sourceChannelPopUpMenu.String = names(1:numChannels);
         handles.dna.channelBox.Visible = 'on';
     else
         handles.dna.sourceChannelPopUpMenu.String = {''};
@@ -351,11 +348,8 @@ function handles = setControlsForNewVideo(hObject, handles)
     % channel
     if getappdata(handles.f,'isMapped')
         numChannels = size(getappdata(handles.f,'ROI'),1);
-        str = cell(numChannels,1);
-        for i=1:numChannels
-            str{i} = num2str(i);
-        end
-        handles.dna.sourceChannelPopUpMenu.String = str;
+        names = getappdata(handles.f,'ROINames');
+        handles.dna.sourceChannelPopUpMenu.String = names(1:numChannels);
         handles.dna.channelBox.Visible = 'on';
         
         mappingInterface('collocalizeDNAImport',hObject,handles);
@@ -549,7 +543,7 @@ function I = getCurrentImage(hObject,handles,brightnessflag)
     
     % current frame/timeAverage
     if timeAverage
-        I = cast(mean(stack,3), class(stack));
+        I = timeAvgStack(stack);
     else
         I = stack(:,:,currentFrame);
     end

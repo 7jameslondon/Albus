@@ -29,9 +29,6 @@ function generateRegistration(hObject,handles)
     
     waitbar(1/numChannels);
     
-    % start a mask of the overlapping channels
-    ROIofOnes = ones(size(I));
-    combinedROIMask = ROIofOnes;
                 
     %% Iterate through each channel to find the TSP weights
     for s = 2:numChannels % no parfor as findParticles has parfor
@@ -81,17 +78,14 @@ function generateRegistration(hObject,handles)
         Y_tps = Y - reshape(XY_tps(:,2),size(Y,1),size(Y,2)); % extract the transform y corridnates 
         
         displacmentFields{s} = cat(3,X_tps,Y_tps);
-        
-        %% Add to a mask to cover non-overlaping portions of the channels
-        combinedROIMask = combinedROIMask .* imwarp(ROIofOnes, displacmentFields{s});
 
         waitbar(s/numChannels);
     end
-    combinedROIMask = logical(combinedROIMask);
     
     %% Save data
     setappdata(handles.f,'displacmentFields',displacmentFields);
-    setappdata(handles.f,'combinedROIMask',combinedROIMask);
+    
+    calculateROIMask(hObject,handles);
     
     waitbar(10/10);
     delete(hWaitBar);

@@ -13,7 +13,6 @@ function handles = createInterface(handles)
     setappdata(handles.f,'Playing_Video', 0);
     setappdata(handles.f,'fret_mode','Source');
     setappdata(handles.f,'fret_currentFrame',1);
-    setappdata(handles.f,'fret_points',cell(0));
     setappdata(handles.f,'data_fret_plt',[])
 
     handles.fret = struct();
@@ -144,11 +143,19 @@ function handles = createInterface(handles)
                                            'Visible','off');
     handles.fret.clusterBox = uix.VBox('Parent', handles.fret.clusterPanel);
     
+    % on/off and count HBox
+    handles.fret.clusterCheckAndCountBox = uix.HBox('Parent', handles.fret.clusterBox);
+    
     % on/off
-    handles.fret.clusterCheckBox = uicontrol(   'Parent', handles.fret.clusterBox,...
+    handles.fret.clusterCheckBox = uicontrol(   'Parent', handles.fret.clusterCheckAndCountBox,...
                                                 'Style' , 'checkbox', ...
                                                 'String', 'Enable',...
                                                 'Callback', @(hObject,~) updateDisplay(hObject,guidata(hObject)));
+                                            
+    % count
+    handles.fret.clusterCount = uicontrol(   'Parent', handles.fret.clusterCheckAndCountBox,...
+                                             'Style' , 'text',...
+                                             'String', '0/0');
     
     % Eccentricity
     % text
@@ -247,11 +254,8 @@ function handles = loadFromSession(hObject,handles,session)
     % channel
     if isappdata(handles.f,'data_video_originalSeperatedStacks')
         numChannels = size(getappdata(handles.f,'data_video_originalSeperatedStacks'),1);
-        str = cell(numChannels,1);
-        for i=1:numChannels
-            str{i} = num2str(i);
-        end
-        handles.fret.sourceChannelPopUpMenu.String = str;
+        names = getappdata(handles.f,'ROINames');
+        handles.fret.sourceChannelPopUpMenu.String = names(1:numChannels);
         handles.fret.channelBox.Visible = 'on';
     else
         handles.fret.sourceChannelPopUpMenu.String = {''};
@@ -349,11 +353,8 @@ function handles = setControlsForNewVideo(hObject, handles)
     % channel
     if getappdata(handles.f,'isMapped')
         numChannels = size(getappdata(handles.f,'ROI'),1);
-        str = cell(numChannels,1);
-        for i=1:numChannels
-            str{i} = num2str(i);
-        end
-        handles.fret.sourceChannelPopUpMenu.String = str;
+        names = getappdata(handles.f,'ROINames');
+        handles.fret.sourceChannelPopUpMenu.String = names(1:numChannels);
         handles.fret.channelBox.Visible = 'on';
         
         mappingInterface('collocalizeFRETImport',hObject,handles);
@@ -414,7 +415,8 @@ function onDisplay(hObject,handles)
     set(handles.axesControl.currentFrame.JavaPeer,'Maximum',size(stack,3));
     set(handles.axesControl.currentFrame.JavaPeer,'Value', getappdata(handles.f,'fret_currentFrame'));
     set(handles.axesControl.currentFrameTextbox,'String', num2str(getappdata(handles.f,'fret_currentFrame')));
-    handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
+    handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', ...
+        @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
     handles.axesControl.currentFrameTextbox.set('Callback', @(hObject,~) setCurrentFrame( hObject, str2num(hObject.String)));
     handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
     
@@ -478,12 +480,18 @@ function updateDisplay(hObject,handles)
                                     'Mask', combinedROIMask,...
                                     'MaxEccentricity',particleMaxEccentricity,...
                                     'MinDistance', particleMinDistance);
+                                
+        totalParticles = findParticles(I, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
+        
+        totalParticlesCount = size(totalParticles{1},1);
     else
         particles = findParticles(I, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
+        totalParticlesCount = size(particles{1},1);
     end
     centers = particles{1};
 
     % display particles
+    hWaitBar = waitbar(0,'Loading ...');
     hold(handles.oneAxes.Axes,'on');
     plt = getappdata(handles.f,'data_fret_plt');
     if ~isempty(plt)
@@ -492,6 +500,12 @@ function updateDisplay(hObject,handles)
     plt = plot( handles.oneAxes.Axes, centers(:,1), centers(:,2), '+r');
     hold(handles.oneAxes.Axes,'off');
     setappdata(handles.f,'data_fret_plt',plt);
+    
+    % display count
+    handles.fret.clusterCount.String = [num2str(size(centers,1)) ' / ' num2str(totalParticlesCount) ' = ' num2str(size(centers,1)/totalParticlesCount*100,'%2.2f') '%'];
+    
+    
+    delete(hWaitBar);
 end
 
 function switchMode(hObject, handles, value)
@@ -579,7 +593,7 @@ function I = getCurrentImage(hObject,handles,brightnessflag)
     
     % current frame/timeAverage
     if timeAverage
-        I = cast(mean(stack,3), class(stack));
+        I = timeAvgStack(stack);
     else
         I = stack(:,:,currentFrame);
     end
@@ -733,8 +747,8 @@ function autoDetect(hObject, handles)
 end
 
 %% Traces
-function openTraces(hObject,handles)
-    if ~exist('handles')
+function openTraces(hObject,handles,loadingSession)
+    if ~exist('handles') || ~isstruct(handles)
         handles = guidata(hObject);
     end
     
@@ -745,7 +759,11 @@ function openTraces(hObject,handles)
     
     onRelease(hObject,handles);
     
-    tracesInterface('onDisplay',hObject,handles);
+    if exist('loadingSession','var')
+        tracesInterface('onDisplay',hObject,handles,loadingSession);
+    else
+        tracesInterface('onDisplay',hObject,handles);
+    end
     handles.leftPanel.Selection = 7;
 end
 

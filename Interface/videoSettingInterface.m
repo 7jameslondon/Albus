@@ -10,7 +10,7 @@ end
 
 %% CreateInterface
 function handles = createInterface(handles)
-    setappdata(handles.f,'video_mode','Select Video');
+    setappdata(handles.f, 'video_mode', 'Select Video');
     setappdata(handles.f, 'vid_imrect', []);
     setappdata(handles.f, 'vid_imrectPos', []);
 
@@ -213,6 +213,7 @@ function handles = setVideoFile(hObject, handles, filePath)
     handles.vid.selectVideoTextBox.String = filePath;
     setappdata(handles.f,'data_video_originalStack',stack);
     setappdata(handles.f,'video_maxIntensity',maxIntensity);
+    setappdata(handles.f,'video_size',size(stack));
     
     close(hWaitBar);
 end
@@ -236,11 +237,14 @@ end
 function autoBrightness(hObject, handles)
     stack = getappdata(handles.f,'data_video_originalStack');
     curretFrame = get(handles.axesControl.currentFrame.JavaPeer,'Value');
+    combinedROIMask = getappdata(handles.f,'combinedROIMask');
+    
     I = stack(:,:,curretFrame);
     if handles.vid.invertCheckbox.Value
         I = imcomplement(I);
     end
-    autoImAdjust = stretchlim(I);
+    
+    autoImAdjust = stretchlim(I(combinedROIMask));
     
     autoImAdjust = round(autoImAdjust * get(handles.vid.brightness.JavaPeer,'Maximum'));
     
@@ -301,7 +305,8 @@ end
 %% Cropping
 function moveCropImRect(hParent,hObject)
     handles = guidata(hParent);
-    setappdata(handles.f,'combinedROIMask',createMask(hObject));
+    setappdata(handles.f, 'vid_imrectPos',hObject.getPosition());
+    calculateROIMask(hParent, handles);
     autoBrightness(hParent, handles);
 end
 
@@ -500,15 +505,19 @@ function postProcessVideo(hObject,handles)
         if getappdata(handles.f,'isMapped')
             mappingInterface('collocalizeVideo',hObject,handles);
         else
-            originalStack = getappdata(handles.f,'data_video_originalStack');
-            lowCut = get(handles.vid.cutting.JavaPeer,'LowValue');
-            highCut = get(handles.vid.cutting.JavaPeer,'HighValue');
+            originalStack   = getappdata(handles.f,'data_video_originalStack');
+            lowCut          = get(handles.vid.cutting.JavaPeer,'LowValue');
+            highCut         = get(handles.vid.cutting.JavaPeer,'HighValue');
+            invertImage     = handles.vid.invertCheckbox.Value;
+            drift           = getappdata(handles.f,'drift');
             
             % cut
             stack = originalStack(:,:,lowCut:highCut); 
             
+            % drift
+            stack = applyDriftCorrection(stack,drift);
+            
             % invert
-            invertImage = handles.vid.invertCheckbox.Value;
             if invertImage
                 for f=1:size(stack,3) 
                     stack(:,:,f) = imcomplement(stack(:,:,f));

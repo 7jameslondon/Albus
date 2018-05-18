@@ -72,6 +72,14 @@ function handles = createInterface(handles)
     handles.tra.meanSlider.JavaPeer.set('Value', 1);
     handles.tra.meanSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setMean_Slider(handles.tra.meanSlider));
     handles.tra.meanBox.set('Widths',[30, -1]);
+    
+    % remove background
+    handles.tra.removeBGCheckbox = uicontrol(   'Parent', handles.tra.settingsBox,...
+                                                'String', 'Remove Background',...
+                                                'Style', 'checkbox',...
+                                                'Callback', @(hObject,~) setRemoveBG(hObject));
+                                            
+    handles.tra.settingsBox.set('Heights',[25,20,20,20,20,20]);
                                     
     %% selection
     handles.tra.selectionPanel = uix.BoxPanel(  'Parent', handles.tra.leftPanel,...
@@ -165,7 +173,7 @@ function handles = createInterface(handles)
                                                 'Callback', @(hObject,~) showPSH(hObject,guidata(hObject)));
                                                  
     %% 
-    handles.tra.leftPanel.set('Heights',[25 150 80 75 250]);
+    handles.tra.leftPanel.set('Heights',[25 200 80 75 250]);
     
     
     %% Right panel
@@ -207,7 +215,7 @@ function handles = createInterface(handles)
     
     %% Graphs
     % grid
-    handles.tra.graphGrid           = uix.GridFlex('Parent', handles.tra.graphPanel, 'Spacing', 5);
+    handles.tra.graphGrid = uix.GridFlex('Parent', handles.tra.graphPanel, 'Spacing', 5);
     
     [~, handles.tra.DAScale] = javacomponent('javax.swing.JSlider');
     handles.tra.DAScale.set('Parent', handles.tra.graphGrid);
@@ -220,11 +228,7 @@ function handles = createInterface(handles)
     uix.Empty('Parent', handles.tra.graphGrid);
     handles.tra.DAAxes              = axes(handles.tra.graphGrid);
     handles.tra.FRETAxes            = axes(handles.tra.graphGrid);
-    handles.tra.DAHistVBox          = uix.VBox('Parent', handles.tra.graphGrid);
-    handles.tra.DonorHistAxes       = axes(handles.tra.DAHistVBox);
-    handles.tra.AcceptorHistAxes    = axes(handles.tra.DAHistVBox);
-    handles.tra.FRETHistAxes        = axes(handles.tra.graphGrid);
-    handles.tra.graphGrid.set('Widths',[30 -4 -1],'Heights',[-1 -1]);
+    handles.tra.graphGrid.set('Widths',[30 -1],'Heights',[-1 -1]);
     
     % plots
     handles.tra.DonorPlot           = plot(handles.tra.DAAxes, 1, '-');
@@ -263,7 +267,13 @@ end
 
 %% Load from session
 function handles = loadFromSession(hObject,handles,session)
-	setappdata(handles.f,'trace_traces', session.tra_traces);
+	setappdata(handles.f,'traces', session.tra_traces);
+    
+    if isempty(session.tra_traces) || any(~session.tra_traces.Calculated)
+        handles.tra.preCalButton.Enable = 'on';
+    else
+        handles.tra.preCalButton.Enable = 'off';
+    end
     
     setappdata(handles.f,'trace_mode', session.tra_mode);
     setappdata(handles.f,'trace_currentTrace', session.tra_currentTrace);
@@ -281,11 +291,13 @@ function handles = loadFromSession(hObject,handles,session)
     set(handles.tra.hmmStatesLowTextBox, 'String', num2str(session.tra_lowStates));
     set(handles.tra.hmmStatesHighTextBox, 'String', num2str(session.tra_highStates));
     
+    handles.tra.removeBGCheckbox.Value = session.tra_removeBG;
+    
     set(handles.tra.DAScale.JavaPeer, 'Value', session.tra_DAScale);
 end
 
 %% Updates
-function onDisplay(hObject,handles)
+function onDisplay(hObject,handles,loadingSession)
     setappdata(handles.f,'mode','Traces');
     
     % get stack
@@ -308,8 +320,10 @@ function onDisplay(hObject,handles)
     set(handles.tra.vidHBox,'Visible','on');
     
     % updates
-    getRawTraceData(hObject, handles);
-    updateMaxTraces(hObject,handles);
+    if ~exist('loadingSession','var') || ~loadingSession
+        getRawTraceData(hObject, handles);
+    end
+    updateMaxTraces(hObject, handles);
     setTrace(hObject,handles,1);
     setVidCurrentFrame(hObject, getappdata(handles.f,'home_currentFrame'));
     scale = handles.tra.DAScale.JavaPeer.get('Value') / handles.tra.DAScale.JavaPeer.get('Maximum')*10;
@@ -363,14 +377,16 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         if ~traces.Calculated(c)
             hWaitBar = waitbar(0,'loading...', 'WindowStyle', 'modal');
             
-            movMeanWidth = handles.tra.meanSlider.JavaPeer.get('Value');
-            minStates = handles.tra.hmmStatesSlider.JavaPeer.get('LowValue');
-            maxStates = handles.tra.hmmStatesSlider.JavaPeer.get('HighValue');
+            movMeanWidth    = handles.tra.meanSlider.JavaPeer.get('Value');
+            minStates       = handles.tra.hmmStatesSlider.JavaPeer.get('LowValue');
+            maxStates       = handles.tra.hmmStatesSlider.JavaPeer.get('HighValue');
             
-            donorLimits = getappdata(handles.f,'donorLimits');
-            acceptorLimits = getappdata(handles.f,'acceptorLimits');
+            donorLimits     = getappdata(handles.f,'donorLimits');
+            acceptorLimits  = getappdata(handles.f,'acceptorLimits');
+            
+            removeBG        = handles.tra.removeBGCheckbox.Value;
     
-            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2));
+            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2), removeBG);
             setappdata(handles.f,'traces',traces); % save
             
             delete(hWaitBar);
@@ -394,14 +410,6 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         handles.tra.FRETStatePlot.XData     = x;
         handles.tra.FRETStatePlot.YData     = traces.FRET_hmm(c,x);
         axis(handles.tra.FRETAxes, [startT, endT, -0.05, 1.05]);
-
-        % Histograms
-        histogram(handles.tra.DonorHistAxes,traces.Donor(c,x), 50, 'Orientation', 'horizontal');
-
-        histogram(handles.tra.AcceptorHistAxes,traces.Acceptor(c,x), 50, 'Orientation', 'horizontal');
-        
-        histogram(handles.tra.FRETHistAxes,traces.FRET(c,x), 50, 'Orientation', 'horizontal');
-
         
         % Video peak circle
         if isappdata(handles.f,'data_trace_plt')
@@ -511,150 +519,40 @@ function pauseVideo(hObject,handles)
 end
 
 %% Trace Data
-function getRawTraceData(hObject, handles)
-    hWaitBar = waitbar(0,'Generating traces ...', 'WindowStyle', 'modal');
-    
-    %% Grab relevent data
-    % get stack
-    if getappdata(handles.f,'isMapped')
-        seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
-        dur = size(seperatedStacks{1},3);
-        numStacks = length(seperatedStacks);
-    else
-        seperatedStacks = getappdata(handles.f,'data_video_stack');
-        dur = size(seperatedStacks,3);
-        numStacks = 1;
-    end
-    
-    I = selectFRETInterface('getCurrentImage',hObject,handles);
-    filterSize = handles.fret.particleFilter.JavaPeer.get('Value') / handles.fret.particleFilter.JavaPeer.get('Maximum') * 5;
-    particleMinInt = handles.fret.particleIntensity.JavaPeer.get('LowValue');
-    particleMaxInt = handles.fret.particleIntensity.JavaPeer.get('HighValue');
-    particleMaxEccentricity = handles.fret.eccentricitySlider.JavaPeer.get('Value')...
-        / handles.fret.eccentricitySlider.JavaPeer.get('Maximum');
-    particleMinDistance = handles.fret.minDistanceSlider.JavaPeer.get('Value')...
-        / handles.fret.minDistanceSlider.JavaPeer.get('Maximum') * 20;
-    combinedROIMask = getappdata(handles.f,'combinedROIMask');
-    edgeDistance = handles.fret.edgeDistanceSlider.JavaPeer.get('Value')...
-        / handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum') * 20;
-    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
-    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
-    
-    %% Find particles
-    particles = findParticles(I, particleMinInt, particleMaxInt, filterSize,...
-                                'Method','GaussianFit',...
-                                'EdgeDistance', edgeDistance,...
-                                'Mask', combinedROIMask,...
-                                'MaxEccentricity', particleMaxEccentricity,...
-                                'MinDistance', particleMinDistance);
-    traces = particles{1};    
-    
-    %% Calculate the donor and acceptor raw traces
-    numTraces = size(traces,1);
-    Donor_raw = zeros(numTraces,dur); % pre-aloc;
-    Acceptor_raw = zeros(numTraces,dur); % pre-aloc;
-    for f=1:dur % no parfor becuase seperatedStacks is too big :(
-        waitbar(f/dur);
-        
-        if numStacks == 2
-            I_donor    = im2double(seperatedStacks{1}(:,:,f));
-            I_acceptor = im2double(seperatedStacks{2}(:,:,f));
-
-            %% interperolate at maskpoints
-            F_donor    = griddedInterpolant(I_donor);
-            F_acceptor = griddedInterpolant(I_acceptor);
-
-            % create 7 by 7 area mask
-            F_del = ( repmat((-1:1/3:1),numTraces,1) .* repmat(traces.HalfWidth*2, 1, 7) );
-            F_x = reshape( repmat( repmat(traces.Center(:,2), 1, 7) + F_del , 1, 7) ,[],1);
-            F_y = reshape( imresize( repmat(traces.Center(:,1), 1, 7) + F_del, [numTraces 49], 'nearest') ,[],1);
-
-            W = (1:49);
-            W = (mod(W,7)-1-3).^2 + (floor(W/7)-3).^2;
-            W = repmat(W,numTraces,1);
-            W = W ./ repmat( 2*(traces.HalfWidth.^2) ,1,49);
-            W = exp(-W);
-
-            Donor_raw(:,f)      = mean((reshape( F_donor(F_x,F_y), [], 49 ) ) .* W ,2);
-            Acceptor_raw(:,f)  	= mean((reshape( F_acceptor(F_x,F_y), [], 49 ) ) .* W ,2);
-        elseif numStacks == 1
-            I_donor    = im2double(seperatedStacks(:,:,f));
-
-            %% interperolate at maskpoints
-            F_donor    = griddedInterpolant(I_donor);
-
-            % create 7 by 7 area mask
-            F_del = ( repmat((-1:1/3:1),numTraces,1) .* repmat(traces.HalfWidth*2, 1, 7) );
-            F_x = reshape( repmat( repmat(traces.Center(:,2), 1, 7) + F_del , 1, 7) ,[],1);
-            F_y = reshape( imresize( repmat(traces.Center(:,1), 1, 7) + F_del, [numTraces 49], 'nearest') ,[],1);
-
-            W = (1:49);
-            W = (mod(W,7)-1-3).^2 + (floor(W/7)-3).^2;
-            W = repmat(W,numTraces,1);
-            W = W ./ repmat( 2*(traces.HalfWidth.^2) ,1,49);
-            W = exp(-W);
-
-            Donor_raw(:,f)      = mean((reshape( F_donor(F_x,F_y), [], 49 ) ) .* W ,2);
-            traces.Acceptor_raw(:,f) = zeros(size(Donor_raw(:,f)));
-        end
-            
-
-    end
-    traces.Donor_raw = Donor_raw;
-    traces.Acceptor_raw = Acceptor_raw;
-    
-    % pre-aloc traces
-    preAloc = zeros(numTraces, dur);
-    traces.Donor        = preAloc;
-    traces.Donor_hmm    = preAloc;
-    traces.Acceptor     = preAloc;
-    traces.Acceptor_hmm = preAloc;
-    traces.FRET         = preAloc;
-    traces.FRET_hmm     = preAloc;
-    traces.Donor_bg     = zeros(numTraces,1);
-    traces.Acceptor_bg  = zeros(numTraces,1);
-    traces.Calculated  = zeros(numTraces,1,'logical');
-        
-    setappdata(handles.f,'traces',traces);
-    
-    donorLimits = stretchlim(traces.Donor_raw,[0.1,0.90]);
-    acceptorLimits = stretchlim(traces.Acceptor_raw,[0.1,0.90]);
-    
-    setappdata(handles.f,'donorLimits',donorLimits);
-    setappdata(handles.f,'acceptorLimits',acceptorLimits);
-    
-    delete(hWaitBar);
-end
 
 function preCalculateAllTraces(hObject, handles)
-    hWaitBar = waitbar(0,'Updating traces ...', 'WindowStyle', 'modal');
-
     % Get data
-    handles.tra.preCalButton.Enable = 'off';
-    traces = getappdata(handles.f,'traces');
-    movMeanWidth = handles.tra.meanSlider.JavaPeer.get('Value');
-    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
-    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
-    x = (startT:endT);
-    numTraces = size(traces,1);
-    minStates = handles.tra.hmmStatesSlider.JavaPeer.get('LowValue');
-    maxStates = handles.tra.hmmStatesSlider.JavaPeer.get('HighValue');
-    donorLimits = getappdata(handles.f,'donorLimits');
-    acceptorLimits = getappdata(handles.f,'acceptorLimits');
-        
-    for c=1:numTraces
-        waitbar(c/numTraces);
-        if ~traces.Calculated(c)
-            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2));
+    traces          = getappdata(handles.f,'traces');
+    movMeanWidth    = handles.tra.meanSlider.JavaPeer.get('Value');
+    startT          = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT            = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    x               = (startT:endT);
+    numTraces       = size(traces,1);
+    minStates       = handles.tra.hmmStatesSlider.JavaPeer.get('LowValue');
+    maxStates       = handles.tra.hmmStatesSlider.JavaPeer.get('HighValue');
+    donorLimits     = getappdata(handles.f,'donorLimits');
+    acceptorLimits  = getappdata(handles.f,'acceptorLimits');
+    removeBG        = handles.tra.removeBGCheckbox.Value;
+    
+    % run calcualtions
+    uncalculatedTraces = ~traces.Calculated;
+    parfor_progress(numTraces);
+    parfor c=1:numTraces
+        if uncalculatedTraces(c)
+            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2), removeBG);
         end
+        
+        parfor_progress;
     end
+	parfor_progress(0);
+        
     
     % save
+    handles.tra.preCalButton.Enable = 'off';
     setappdata(handles.f,'traces',traces);
-    delete(hWaitBar);
 end
 
-function trace = calculateTraceData(trace, movMeanWidth, x, minStates, maxStates, donorScale, acceptorScale)
+function trace = calculateTraceData(trace, movMeanWidth, x, minStates, maxStates, donorScale, acceptorScale, removeBG)
     % Get original traces
     Donor       = movmean(trace.Donor_raw(1,x), movMeanWidth);
     Acceptor    = movmean(trace.Acceptor_raw(1,x), movMeanWidth);
@@ -665,10 +563,15 @@ function trace = calculateTraceData(trace, movMeanWidth, x, minStates, maxStates
     % Background
     trace.Donor_bg(1)          = min(trace.Donor_hmm(1,x));
     trace.Acceptor_bg(1)       = min(trace.Acceptor_hmm(1,x));
-    trace.Donor_hmm(1,x)       = trace.Donor_hmm(1,x) - trace.Donor_bg(1);
-    trace.Acceptor_hmm(1,x)    = trace.Acceptor_hmm(1,x) - trace.Acceptor_bg(1);
-    trace.Donor(1,x)           = Donor - trace.Donor_bg(1);
-    trace.Acceptor(1,x)        = Acceptor - trace.Acceptor_bg(1);
+    if removeBG
+        trace.Donor_hmm(1,x)       = trace.Donor_hmm(1,x) - trace.Donor_bg(1);
+        trace.Acceptor_hmm(1,x)    = trace.Acceptor_hmm(1,x) - trace.Acceptor_bg(1);
+        trace.Donor(1,x)           = Donor - trace.Donor_bg(1);
+        trace.Acceptor(1,x)        = Acceptor - trace.Acceptor_bg(1);
+    else
+        trace.Donor(1,x)           = Donor;
+        trace.Acceptor(1,x)        = Acceptor;
+    end
     % Fret
     trace.FRET(1,x)            = trace.Acceptor(1,x) ./ (trace.Acceptor(1,x) + trace.Donor(1,x));
     noFRETInd                  = (trace.Donor_hmm(1,:)==0 | trace.Acceptor_hmm(1,:)==0);
@@ -796,6 +699,18 @@ function setMean_Slider(hObject)
     traces.Calculated  = zeros(size(traces,1),1,'logical');
     
     setappdata(handles.f,'traces',traces); % save first
+    updateDisplay(hObject,handles);
+end
+
+function setRemoveBG(hObject)
+    handles = guidata(hObject);
+    
+    % reset all pre-calculations
+    handles.tra.preCalButton.Enable = 'on';
+    traces = getappdata(handles.f,'traces');
+    traces.Calculated  = zeros(size(traces,1),1,'logical');
+    setappdata(handles.f,'traces',traces); % save before updating
+    
     updateDisplay(hObject,handles);
 end
 

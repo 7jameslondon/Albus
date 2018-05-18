@@ -5,6 +5,8 @@ function tracks = triTrackTracking( particlesByFrame, maxMovment )
         error('Needs three frames')
     end
     
+    hWaitBar = waitbar(0,'Tracking Particles...', 'WindowStyle', 'modal');
+    
     %% Setup the required varibles
     numFrames = size(particlesByFrame,1);
     
@@ -14,25 +16,27 @@ function tracks = triTrackTracking( particlesByFrame, maxMovment )
     tracksIdx = zeros(0,numFrames);
     
     %% Find track indexs
-    for f = 2:numFrames-1        
+    for f = 2:numFrames-1
+        waitbar(f/numFrames);
+        
         prevParticles = particlesByFrame{f-1};
         currParticles = particlesByFrame{f};
         nextParticles = particlesByFrame{f+1};
         
         idx = minCostMaxFlow(prevParticles,currParticles,nextParticles, maxMovment);
-        
+    
         %% Connect Triplets
         for i = 1:size(idx,1)
             % is the triplet completely new
-            j = find(idx(i,3) == tracksIdx(:,f));
-            if isempty(j) % new triplet
+            j = idx(i,1) == tracksIdx(:,f-1) & idx(i,2) == tracksIdx(:,f);
+            if ~any(j) % new triplet
                 tracksIdx(end+1,f-1:f+1) = idx(i,1:3);
             else % old triplet
                 tracksIdx(j,f+1) = idx(i,3);
             end
         end
     end
-    
+
     %% Get the positions of tracks
     % list of zeros
     z = zeros(size(tracksIdx,1),1);
@@ -50,5 +54,6 @@ function tracks = triTrackTracking( particlesByFrame, maxMovment )
         tracks.Positions(i) = {pos};
     end
     
+    delete(hWaitBar);
 end
 

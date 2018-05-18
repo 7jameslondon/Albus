@@ -136,13 +136,14 @@ function handles = createInterface
     handles.rightPanelTra   = uix.Panel('Parent', handles.rightPanel, 'BorderType', 'none');
     
     %% create sub-interfaces
-    handles = homeInterface('createInterface',handles);
+    handles = homeInterface(        'createInterface',handles);
     handles = videoSettingInterface('createInterface',handles);
-    handles = mappingInterface('createInterface',handles);
-    handles = selectDNAInterface('createInterface',handles);
-    handles = kymographInterface('createInterface',handles);
-    handles = selectFRETInterface('createInterface',handles);
-    handles = tracesInterface('createInterface',handles);
+    handles = mappingInterface(     'createInterface',handles);
+    handles = selectDNAInterface(   'createInterface',handles);
+    handles = kymographInterface(   'createInterface',handles);
+    handles = selectFRETInterface(  'createInterface',handles);
+    handles = tracesInterface(      'createInterface',handles);
+    handles = driftInterface(       'createInterface',handles);
 
     %% save and display
     handles.rightPanel.Selection = 1;% start with the default right panel

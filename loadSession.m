@@ -42,6 +42,33 @@ function flag = loadSession(hObject)
     if ~isfield(session,'version')
         session.version = 0.0;
     end
+    % create remove background for traces
+    if ~isfield(session,'removeBG')
+        session.tra_removeBG = false;
+    end
+    % 0.43 - Drift Correction
+    if ~isfield(session,'drift_isDriftCorrected')
+        session.drift                       = [];
+        session.drift_isDriftCorrected      = false;
+        
+        session.drift_selectedChannel       = 1;
+        session.drift_invertImage           = false;
+        session.drift_lowBrightness         = 2^8;
+        session.drift_highBrightness        = 2^8;
+
+        session.drift_markParticles         = 1;
+        session.drift_particleIntensityLow  = 2^8;
+        session.drift_particleIntensityHigh = 2^8;
+        session.drift_particleFilter        = 0;
+        session.drift_maxDistance           = 2e5;
+        
+        session.drift_meanLength            = 1;
+    end
+    % Color picker for mapping channels
+    if ~isfield(session,'ROINames')
+        session.ROINames  = [{'Channel 1'}, {'Channel 2'}, {'Channel 3'}, {'Channel 4'}, {'Channel 5'}, {'Channel 6'}];
+    end
+        
     
     
     %% Setup general variables
@@ -50,8 +77,10 @@ function flag = loadSession(hObject)
     setappdata(handles.f,'savePath',session.savePath);
     setappdata(handles.f,'ROI',session.ROI); % ROI will each get updated by updateDisplay calls in the GUIs
     setappdata(handles.f,'colors',session.colors);
+    setappdata(handles.f,'ROINames',session.ROINames);
     setappdata(handles.f,'mode',session.mode);
     setappdata(handles.f,'isMapped',session.isMapped);
+    setappdata(handles.f,'drift',session.drift);
     setappdata(handles.f,'kyms',session.kyms);
     setappdata(handles.f,'combinedROIMask',session.combinedROIMask);
     if isfield(session,'displacmentFields') ~= 0
@@ -71,6 +100,8 @@ function flag = loadSession(hObject)
     waitbar(2/5,hWaitBar)
     
     %% Colocalize video/treat it
+    handles = driftInterface('loadFromSession',hObject,handles,session);
+    
     videoSettingInterface('postProcessVideo',hObject,handles);
     waitbar(3/5,hWaitBar)
     
@@ -96,7 +127,7 @@ function flag = loadSession(hObject)
         case 'Select FRET'
             homeInterface('openSelectFRET',hObject);
         case 'Traces'
-            selectFRETInterface('openTraces',hObject);
+            selectFRETInterface('openTraces',hObject,0,1); % 0, is to stop handles, 1 is a flag to suppress recalculation of trace data
     end
     handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag());
     

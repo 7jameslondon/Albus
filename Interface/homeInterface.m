@@ -15,23 +15,43 @@ function handles = createInterface(handles)
     handles.home.VButtonBox = uix.VButtonBox(   'Parent', handles.home.leftPanel, ...
                                                 'ButtonSize', [200 25]);
     handles.home.bottomSpace = uix.Empty('Parent', handles.home.leftPanel );
-    handles.home.leftPanel.set('Heights',[100, -1]);
+    handles.home.leftPanel.set('Heights',[200, -1]);
 
-    handles.home.vidButton = uicontrol( 'Parent', handles.home.VButtonBox,...
-                                    'String', 'Video Settings',...
-                                    'Callback', @(hObject,~) openVideoSettings(hObject));
-    handles.home.mapButton = uicontrol( 'Parent', handles.home.VButtonBox,...
-                                    'String', 'Register Channels',...
-                                    'Callback', @(hObject,~) openMapping(hObject));
-    handles.home.dnaButton = uicontrol( 'Parent', handles.home.VButtonBox,...
-                                        'String', 'Select DNA',...
-                                        'Callback', @(hObject,~) openSelectDNA(hObject));
-    handles.home.fretButton = uicontrol('Parent', handles.home.VButtonBox,...
-                                        'String', 'Select FRET',...
-                                        'Callback', @(hObject,~) openSelectFRET(hObject));
+    handles.home.vidButton = uicontrol(     'Parent', handles.home.VButtonBox,...
+                                            'String', 'Import Video',...
+                                            'Callback', @(hObject,~) openVideoSettings(hObject));
+                                
+    handles.home.mapButton = uicontrol(     'Parent', handles.home.VButtonBox,...
+                                            'String', 'Register Channels',...
+                                            'Callback', @(hObject,~) openMapping(hObject));
+                                
+    handles.home.driftButton = uicontrol(   'Parent', handles.home.VButtonBox,...
+                                            'String', 'Correct Drift',...
+                                            'Callback', @(hObject,~) openDriftCorrection(hObject),...
+                                            'Enable', 'off');
+                                
+    handles.home.dnaButton = uicontrol(     'Parent', handles.home.VButtonBox,...
+                                            'String', 'Generate Kymographs',...
+                                            'Callback', @(hObject,~) openSelectDNA(hObject),...
+                                            'Enable', 'off');
+                                    
+    handles.home.fretButton = uicontrol(    'Parent', handles.home.VButtonBox,...
+                                            'String', 'Generate FRET Traces',...
+                                            'Callback', @(hObject,~) openSelectFRET(hObject),...
+                                            'Enable', 'off');
 end
 
 %% Callbacks
+% handles.leftPanel.Selection = #
+% 1 - home
+% 2 - video
+% 3 - mapping
+% 4 - generate kymographs
+% 5 - analze kymographs
+% 6 - generate fret
+% 7 - analyze fret
+% 8 - drift
+
 function openVideoSettings(hObject)
     handles = guidata(hObject);
     setappdata(handles.f,'mode','Video Settings');
@@ -45,6 +65,17 @@ function openHome(hObject)
     handles = guidata(hObject);
     setappdata(handles.f,'mode','Home');
     
+    % disable/enable buttons if video is avalible
+    if strcmp(handles.vid.selectVideoTextBox.String, 'No video selected')
+        handles.home.driftButton.Enable = 'off';
+        handles.home.dnaButton.Enable   = 'off';
+        handles.home.fretButton.Enable  = 'off';
+    else
+        handles.home.driftButton.Enable = 'on';
+        handles.home.dnaButton.Enable   = 'on';
+        handles.home.fretButton.Enable  = 'on';
+    end
+    
     handles.leftPanel.Selection = 1;
     onDisplay(hObject,handles);
 end
@@ -56,6 +87,15 @@ function openMapping(hObject)
     
     handles.leftPanel.Selection = 3;
     mappingInterface('onDisplay',hObject,handles);
+end
+
+function openDriftCorrection(hObject)
+    handles = guidata(hObject);
+    setappdata(handles.f,'mode','Drift');
+    onRelease(hObject,handles)
+    
+    handles.leftPanel.Selection = 8;
+    driftInterface('onDisplay',hObject,handles);
 end
 
 function openSelectDNA(hObject)
@@ -106,20 +146,27 @@ end
 
 function I = getCurrentOneAxesImage(hObject,handles)
     currentFrame = getappdata(handles.f,'home_currentFrame');
+    combinedROIMask = getappdata(handles.f,'combinedROIMask');
     
     if getappdata(handles.f,'isMapped')
         colors = getappdata(handles.f,'colors');
-        seperatedStacks = getappdata(handles.f,'data_video_treatedSeperatedStacks');
+        seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
         
         seperatedFrames = cell(length(seperatedStacks),1); % pre-aloc
         for i=1:length(seperatedStacks)
-            seperatedFrames{i} = seperatedStacks{i}(:,:,currentFrame);
+            I = seperatedStacks{i}(:,:,currentFrame);
+            
+            % overalp mask
+            I(~combinedROIMask) = 0;
+            % brightness
+            I(combinedROIMask) = imadjust(I(combinedROIMask));
+            
+            seperatedFrames{i} = I;
         end
         I = rgbCombineSeperatedImages(seperatedFrames, colors);
             
     else
         stack = getappdata(handles.f,'data_video_stack');
-        combinedROIMask = getappdata(handles.f,'combinedROIMask');
         
         % current frame
         I = stack(:,:,currentFrame);

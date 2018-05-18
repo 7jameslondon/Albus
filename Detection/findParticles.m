@@ -135,12 +135,11 @@ function particlesByFrame = findParticles( varargin )
     % the image in provided axes with a red dot. This is intended to 
     % only be used when a single image is provided.
     if ~isempty(v.DisplayAxes)
-        axes(v.DisplayAxes);
         hold on;
         if strcmp(v.Method,'GaussianFit')
-            plt = plot(particlesByFrame{1}.Center(:,1), particlesByFrame{1}.Center(:,2), '.');
+            plt = plot(v.DisplayAxes, particlesByFrame{1}.Center(:,1), particlesByFrame{1}.Center(:,2), '.');
         else
-            plt = plot(particlesByFrame{1}(:,1), particlesByFrame{1}(:,2), '.');
+            plt = plot(v.DisplayAxes, particlesByFrame{1}(:,1), particlesByFrame{1}(:,2), '.');
         end
         set(plt,'Color',v.Color)
         hold off;
