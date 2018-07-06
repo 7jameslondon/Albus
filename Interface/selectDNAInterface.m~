@@ -689,7 +689,7 @@ function autoDetectDNA(hObject, handles)
     end
     
     %% Setup
-    hWaitBar = waitbar(0,'Finding DNA...', 'WindowStyle', 'modal');
+    hWaitBar = waitbar(0,'Finding DNA ...');
     
     updateDNAKernal(hObject, handles);
     dnaKernal = getappdata(handles.f,'dnaKernal');
@@ -725,7 +725,7 @@ function autoDetectDNA(hObject, handles)
     for i=1:numTotalFound
         if corrs(i) > dnaMatchingStrength * sum(sum(dnaKernal))*2^16 / 100
             % create new dan at pos found
-            addNewDNA(hObject, handles, [rects(i,1:2)+[0 rects(i,4)/2]; rects(i,1:2)+[rects(i,3) rects(i,4)/2]]);
+            addNewDNA(hObject, handles, [rects(i,1:2)+[0 rects(i,4)/2]; rects(i,1:2)+[rects(i,3) rects(i,3)]]);
         end
 
         % update loading bar
@@ -892,17 +892,13 @@ function resetDNAGraphics(hObject,handles)
 end
 
 function removeAllDNA(hObject,handles)
-    hWaitBar = waitbar(0,'Removing DNA...', 'WindowStyle', 'modal');
-
     dnaImlines = getappdata(handles.f,'dna_dnaImlines');
     % delete each imline graphic object
     for i=1:length(dnaImlines)
         delete(dnaImlines{i});
-        waitbar(i/length(dnaImlines));
     end
     
     setappdata(handles.f,'dna_dnaImlines',cell(0));
-    delete(hWaitBar);
 end
 
 function removeAllDNA_Callback(hObject,handles)

@@ -18,7 +18,7 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
     
     session = struct();
     
-    session.version             = 0.43;
+    session.version             = 0.44;
     session.ROI                 = getappdata(handles.f,'ROI');
     session.colors              = getappdata(handles.f,'colors');
     session.ROINames            = getappdata(handles.f,'ROINames');
@@ -95,10 +95,9 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             session.dna_highBrightness  = get(handles.dna.brightness.JavaPeer, 'HighValue');
             session.dna_timeAvg         = handles.dna.sourceTimeAvgCheckBox.Value;
             
-            session.dna_autoDnaBinaryThreshold = str2double(handles.dna.autoDnaBinaryThresholdTextBox.String);
-            session.dna_autoDnaMinLength       = str2double(handles.dna.autoDnaLengthMinTextBox.String);
-            session.dna_autoDnaMaxLength       = str2double(handles.dna.autoDnaLengthMaxTextBox.String);
-            session.dna_autoDnaMinEccentricity = str2double(handles.dna.autoDnaMinEccentricityTextBox.String);
+            session.dna_dnaWidth            = get(handles.dna.dnaWidthSlider.JavaPeer,'Value');
+            session.dna_dnaLength           = get(handles.dna.dnaLengthSlider.JavaPeer,'Value');
+            session.dna_dnaMatchingStrength = get(handles.dna.dnaMatchingStrengthSlider.JavaPeer,'Value');
             
             % update any changes that result from Imline moves
             if strcmp(getappdata(handles.f,'mode'),'Select DNA')

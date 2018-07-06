@@ -9,65 +9,7 @@ function flag = loadSession(hObject)
     hWaitBar = waitbar(0,'Loading in session...', 'WindowStyle', 'modal');
     load([loadPath loadName]);
     
-    %% Handles changes from old versions
-    % create save path
-    if ~isfield(session,'savePath')
-        uiwait(msgbox('What folder should data be saved in?','Save'));
-        session.savePath = uigetdir('Where should the data be saved'); 
-    end
-    % create traces
-    if ~isfield(session.kyms, 'Traces')
-        session.kyms.Traces(:,1) = cell(size(session.kyms,1),1);
-    end
-    % switch dna auto settings
-    if ~isfield(session, 'dna_autoDnaMaxLength')
-        session.dna_autoDnaMaxLength = 100;
-        
-        session.dna_autoDnaBinaryThreshold  = str2double(session.dna_autoDnaBinaryThreshold);
-        session.dna_autoDnaMinLength        = str2double(session.dna_autoDnaMinLength);
-        session.dna_autoDnaMinEccentricity  = str2double(session.dna_autoDnaMinEccentricity);
-    end
-    % create kymograph brightness
-    if ~isfield(session, 'kym_lowBrightness')
-        session.kym_invertImage   = false;
-        session.kym_lowBrightness = 0;
-        session.kym_highBrightness = 1e6;
-    end
-    % create combinedROIMask
-    if ~isfield(session,'combinedROIMask')
-        session.combinedROIMask = true;
-        session.vid_imrectPos = [];
-    end
-    % create version
-    if ~isfield(session,'version')
-        session.version = 0.0;
-    end
-    % create remove background for traces
-    if ~isfield(session,'removeBG')
-        session.tra_removeBG = false;
-    end
-    % 0.43 - Drift Correction
-    if ~isfield(session,'drift_isDriftCorrected')
-        session.drift                       = [];
-        session.drift_isDriftCorrected      = false;
-        
-        session.drift_selectedChannel       = 1;
-        session.drift_invertImage           = false;
-        session.drift_lowBrightness         = 2^8;
-        session.drift_highBrightness        = 2^8;
-
-        session.drift_markParticles         = 1;
-        session.drift_particleIntensityLow  = 2^8;
-        session.drift_particleIntensityHigh = 2^8;
-        session.drift_particleFilter        = 0;
-        session.drift_maxDistance           = 2e5;
-        
-        session.drift_meanLength            = 1;
-    end
-    % Color picker for mapping channels
-    if ~isfield(session,'ROINames')
-        session.ROINames  = [{'Channel 1'}, {'Channel 2'}, {'Channel 3'}, {'Channel 4'}, {'Channel 5'}, {'Channel 6'}];
-    end
+    %% Handles changes from old versions 0.44 and forward
         
     
     
