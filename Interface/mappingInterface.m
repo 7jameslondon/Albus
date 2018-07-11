@@ -615,7 +615,7 @@ function editMultiAxesCallback(hObject, handles, id)
       setappdata(handles.f,'colors',colors);
    end    
 
-    function onClose()
+   function onClose()
         % save text (color is already saved)
         names{id} = nameInput.String;
         setappdata(handles.f,'ROINames',names);
@@ -623,7 +623,9 @@ function editMultiAxesCallback(hObject, handles, id)
         % update display
         handles.multiAxes.titleText{id}.String = nameInput.String;
         handles.multiAxes.editButton{id}.BackgroundColor = colors(id,:);
-        updateParticleDetection(hObject);
+        if strcmp(getappdata(handles.f,'mode'),'Mapping')
+            updateParticleDetection(hObject);
+        end
     end
 end
 

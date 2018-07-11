@@ -706,6 +706,10 @@ function saveImpolysToTraces(hObject,handles)
     % then the whole graphics object.
     row = getappdata(handles.f,'data_currentDNA');
     kyms = getappdata(handles.f,'kyms');
+    if row > size(kyms.Traces,1)
+        row = 1;
+        setappdata(handles.f,'data_currentDNA',1);
+    end
     traces = kyms.Traces{row};
     traceImpolys = getappdata(handles.f,'kym_kymImpoly');
     

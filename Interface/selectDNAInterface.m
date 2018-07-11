@@ -519,7 +519,7 @@ function stack = getSourceStack(hObject,handles)
     if isempty(handles.dna.sourceChannelPopUpMenu.String{1})
         switch handles.dna.sourcePopUpMenu.Value
             case 2 % Current vid
-                stack = getappdata(handles.f,'data_video_originalStack');
+                stack = getappdata(handles.f,'data_video_stack');
 
             case 3 % Import
                 stack = getappdata(handles.f,'data_dnaImport_originalStack');
