@@ -28,8 +28,8 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
     session.autoSavePath        = saveFullPath;
     session.savePath            = getappdata(handles.f,'savePath');
     session.combinedROIMask     = getappdata(handles.f,'combinedROIMask');
-    
-    session.video_maxIntensity   = getappdata(handles.f,'video_maxIntensity');
+    session.playSpeed           = getappdata(handles.f,'playSpeed');
+    session.video_maxIntensity  = getappdata(handles.f,'video_maxIntensity');
 
     
     %% Register Channels
@@ -101,17 +101,16 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             
             % update any changes that result from Imline moves
             if strcmp(getappdata(handles.f,'mode'),'Select DNA')
-                selectDNAInterface('saveImlinesToKyms',handles.f,handles);
+                generateKymographInterface('saveImlinesToKyms',handles.f,handles);
             elseif strcmp(getappdata(handles.f,'mode'),'Kymographs')
-                kymographInterface('refreshKymAxes',hObject,handles);
+                analyzeKymographInterface('refreshKymAxes',hObject,handles);
             end
             session.kyms = getappdata(handles.f,'kyms');
             
         %% Analyze Kymographs
         % this data will always be saved unlike the above        
             session.kym_invertImage     = handles.kym.invertCheckbox.Value;
-            session.kym_lowBrightness   = get(handles.kym.brightness.JavaPeer, 'LowValue');
-            session.kym_highBrightness  = get(handles.kym.brightness.JavaPeer, 'HighValue');
+            session.kym_syncBrightness  = handles.kym.syncBrightness.Value;
             
         %% Generate FRET Traces
         % this data will always be saved unlike the above
@@ -150,8 +149,37 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             session.tra_DAScale         = get(handles.tra.DAScale.JavaPeer, 'Value');
             
             session.tra_removeBG        = handles.tra.removeBGCheckbox.Value;
+            
+       %% Analyze FRET Traces
+        % this data will always be saved unlike the above
+            session.flowStrechingProfiles= getappdata(handles.f,'flowStrechingProfiles');
+            
+            session.flow_mode            = getappdata(handles.f,'flow_mode');
+            session.flow_currentFrame    = getappdata(handles.f,'flow_currentFrame');
+            session.flow_invertImage     = handles.flow.invertCheckbox.Value;
+            session.flow_lowBrightness   = get(handles.flow.brightness.JavaPeer, 'LowValue');
+            session.flow_highBrightness  = get(handles.flow.brightness.JavaPeer, 'HighValue');
+            session.flow_timeAvg         = handles.flow.sourceTimeAvgCheckBox.Value;
+            
+            session.flow_particleIntensityLow   = handles.flow.particleIntensity.JavaPeer.get('LowValue');
+            session.flow_particleIntensityHigh  = handles.flow.particleIntensity.JavaPeer.get('HighValue');
+            session.flow_particleFilter         = handles.flow.particleFilter.JavaPeer.get('Value');
+            
+            session.flow_trackingDistance       = str2double(handles.flow.trackingDistance.String);
+            
+            session.flow_backgroundFilePath      = handles.flow.selectBackgroundVideoTextBox.String;
+            
     end
     
-    save(saveFullPath,'session');
+    try
+        save(saveFullPath,'session');
+    catch
+        msgbox('There was a problem saving. Select a save location.','There was a problem saving.');
+        [saveName, savePath, ~] = uiputfile({'*.mat'}, 'Save session', 'session.mat'); 
+        saveFullPath = [savePath saveName];
+        setappdata(handles.f,'autoSavePath',saveFullPath);
+        setappdata(handles.f,'savePath',savePath);
+        save(saveFullPath,'session');
+    end
     close(hWaitBar);
 end

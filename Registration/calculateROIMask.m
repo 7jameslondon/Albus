@@ -20,13 +20,14 @@ function calculateROIMask(~,handles)
         ROIofOnes = ones(videoSize(1:2));
 
         % Crop out section from video setting croping
-        if ~getappdata(handles.f,'isMapped')
-            videoImrectPos = getappdata(handles.f, 'vid_imrectPos');
-            videoSettingsSelection = ROIofOnes;
-            videoSettingsSelection(videoImrectPos(2):videoImrectPos(2)+videoImrectPos(4), ...
-                videoImrectPos(1):videoImrectPos(1)+videoImrectPos(3)) = 0;
-            ROIofOnes(logical(videoSettingsSelection)) = 0;
-        end
+        videoImrectPos = round(getappdata(handles.f, 'vid_imrectPos'));
+        videoSettingsSelection = ROIofOnes;
+        x1 = max(videoImrectPos(2),1);
+        y1 = max(videoImrectPos(1),1);
+        x2 = min(videoImrectPos(2)+videoImrectPos(4),videoSize(1));
+        y2 = min(videoImrectPos(1)+videoImrectPos(3),videoSize(2));
+        videoSettingsSelection( x1:x2, y1:y2) = 0;
+        ROIofOnes(logical(videoSettingsSelection)) = 0;
         combinedROIMask = ROIofOnes;
     end
     

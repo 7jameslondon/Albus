@@ -127,20 +127,42 @@ function idx = minCostMaxFlow(prevPositions,currPositions,nextPositions,maxMovme
     x = linprog(costs, [], [], I', zeros(num_nodes,1), zeros(num_edges,1), capacites, options);
     x = round(x);
     
+    % resolve cases of identical costs for the same nodes
+    while size(x,1) < num_triplets || isempty(x)
+        [unique_costs, ~, unique_indexs] = unique(costs(1:num_triplets)); 
+        occurances = accumarray(unique_indexs,1);
+        [~, max_occurances] = max(occurances);
+        frequent_cost = unique_costs(max_occurances);        
+        frequent_cost_index = find(costs==frequent_cost);
+        costs(frequent_cost_index(1)) = costs(frequent_cost_index(1)) * 0.99;
+        
+        x = linprog(costs, [], [], I', zeros(num_nodes,1), zeros(num_edges,1), capacites, options);
+        x = round(x);
+    end
+    
     fullFlowIdx = reshape(triplets(repmat(x(1:num_triplets)==3,1,3)),[],3);
     
     %% Combine the no conflict indexes and the linear programing full flow indexs
     idx = [noConflicts; fullFlowIdx];
-    
 
     %% PLOT
     if exist('plotGraph','var') && plotGraph
         figure(2)
-        G = digraph(inc2adj(-I));
-        H = plot(G,'Layout','layered','EdgeLabel',G.Edges.Weight);
+        G = digraph(ItoA(I));
+        H = plot(G,'Layout','layered','EdgeLabel', costs);
         highlight(H,'Edges',find(x>0),'EdgeColor','r','linewidth',1);
         highlight(H,'Edges',find(x==3),'EdgeColor','g','linewidth',1);
     end
     
 end
+
+function A = ItoA(I)
+    I = -I.';
+    N = size(I,1);
+    [N1, ~] = find(I == 1);
+    [N2, ~] = find(I == -1);
+    A = sparse(N1, N2, 1, N, N);
+end
+
+
 

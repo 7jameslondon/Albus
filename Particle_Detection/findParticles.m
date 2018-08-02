@@ -32,6 +32,8 @@ function particlesByFrame = findParticles( varargin )
     
     p.addParameter('MaxEccentricity',1); % this can not be used with tracking or with multiple stacks
     p.addParameter('MinDistance',-1); % this can not be used with tracking or with multiple stacks
+    
+    p.addParameter('Waitbar',[]); % only for gaussian methods
 
     p.parse(varargin{:});
     v = p.Results;
@@ -46,9 +48,16 @@ function particlesByFrame = findParticles( varargin )
 
     if strcmp(v.Method,'Centroid')
         %% WeightedCentroid method
-        parfor f = 1:size(v.S,3) % iterate through frames
-            I = v.S(:,:,f);
-            particlesByFrame{f} = findByCentroid(I, v.Mask, v.gaussFilterSigma, v.minMeanPeakIntensity, v.maxMeanPeakIntensity, v.MaxEccentricity);
+        if size(v.S,3) > 10
+            parfor f = 1:size(v.S,3) % iterate through frames
+                I = v.S(:,:,f);
+                particlesByFrame{f} = findByCentroid(I, v.Mask, v.gaussFilterSigma, v.minMeanPeakIntensity, v.maxMeanPeakIntensity, v.MaxEccentricity);
+            end
+        else
+            for f = 1:size(v.S,3) % iterate through frames
+                I = v.S(:,:,f);
+                particlesByFrame{f} = findByCentroid(I, v.Mask, v.gaussFilterSigma, v.minMeanPeakIntensity, v.maxMeanPeakIntensity, v.MaxEccentricity);
+            end
         end
         
     elseif strcmp(v.Method,'GaussianFit')
@@ -58,6 +67,9 @@ function particlesByFrame = findParticles( varargin )
         gauss2d = fittype(@(a,mu1,mu2,sig,x1,y1) a*exp(-((x1-mu1).^2 + (y1-mu2).^2)/(2*sig^2)), 'independent', {'x1','y1'});
         
         for f = 1:size(v.S,3) % iterate through frames
+            if ~isempty(v.Waitbar)
+                waitbar(f/size(v.S,3),v.Waitbar);
+            end
             I = v.S(:,:,f);
             particlesByFrame{f} = findByGauss(I, v.Mask, v.gaussFilterSigma, v.minMeanPeakIntensity, v.maxMeanPeakIntensity, v.MaxEccentricity);
         end
@@ -67,6 +79,9 @@ function particlesByFrame = findParticles( varargin )
         [meshX,meshY] = meshgrid(1:size(v.S(:,:,1),2), 1:size(v.S(:,:,1),1));
         
         for f = 1:size(v.S,3) % iterate through frames
+            if ~isempty(v.Waitbar)
+                waitbar(f/size(v.S,3),v.Waitbar);
+            end
             I = v.S(:,:,f);
             particlesByFrame{f} = findByFastGauss(I, v.Mask, v.gaussFilterSigma, v.minMeanPeakIntensity, v.maxMeanPeakIntensity, v.MaxEccentricity);
         end

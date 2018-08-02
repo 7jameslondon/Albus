@@ -11,31 +11,32 @@ function collocalizeVideo(hObject,handles)
     combinedROIMask     = getappdata(handles.f,'combinedROIMask');
     drift               = getappdata(handles.f,'drift');
     
-    %% Seperate Stacks
-    seperatedStacks = seperateStack(ROI,stack);
-    
+    %% Seperate Stacks    
     % Collocalize stacks
-    collocalisedSeperatedStacks = seperatedStacks;
+    collocalisedSeperatedStacks = seperateStack(ROI,stack);
     collocalisedSeperatedStacks(2:end) = arrayfun( ...
-        @(i) colocalizeStack(seperatedStacks{i}, displacmentFields{i}), ...
+        @(i) colocalizeStack(collocalisedSeperatedStacks{i}, displacmentFields{i}), ...
         (2:numChannels) , 'UniformOutput' , false );
     
     %% Get adjusted seperatedStacks
-    seperatedStacks = collocalisedSeperatedStacks;
+    seperatedStacks = cell(size(collocalisedSeperatedStacks));
     for s = 1:numChannels
+        stack = collocalisedSeperatedStacks{s}(:,:,startCut:endCut);
         % drift
-        seperatedStacks{s} = applyDriftCorrection(seperatedStacks{s},drift);
+        stack = applyDriftCorrection(stack,drift);
         
-        for f = startCut:endCut
-            I = seperatedStacks{s}(:,:,f);
+        for f = 1:size(stack,3)
+            I = stack(:,:,f);
             % invert
             if invertImage
                 I = imcomplement(I);
             end
             % mask
             I(~combinedROIMask) = 0;
-            seperatedStacks{s}(:,:,f) = I;
+            stack(:,:,f) = I;
         end
+        
+        seperatedStacks{s} = stack;
     end
 
     

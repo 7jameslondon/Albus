@@ -1,4 +1,4 @@
-function getRawTraceData(hObject, handles)
+function generateFRETTraces(hObject, handles)
     hWaitBar = waitbar(0,'Generating traces ...', 'WindowStyle', 'modal');
     
     %% Grab relevent data
@@ -13,7 +13,7 @@ function getRawTraceData(hObject, handles)
         numStacks = 1;
     end
     
-    I = selectFRETInterface('getCurrentImage',hObject,handles);
+    I = generateFRETInterface('getCurrentImage',hObject,handles);
     filterSize = handles.fret.particleFilter.JavaPeer.get('Value') / handles.fret.particleFilter.JavaPeer.get('Maximum') * 5;
     particleMinInt = handles.fret.particleIntensity.JavaPeer.get('LowValue');
     particleMaxInt = handles.fret.particleIntensity.JavaPeer.get('HighValue');

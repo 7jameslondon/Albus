@@ -1,11 +1,11 @@
-function [stack, maxIntensity] = getStackFromFile( filePath, hWaitbar )
+function [stack, maxIntensity] = getStackFromFile( filePath, hWaitbar, imageFlag )
     % Sets 'stack' to 0 if an error is encountered and displayes the error
     % message in a pop-up.
     
     try
         videoInfo = imfinfo(filePath);
         
-        if length(videoInfo) < 2
+        if length(videoInfo) < 2 && (~exist('imageFlag','var') || ~imageFlag)
             error('This is a single image not a video');
         end
         

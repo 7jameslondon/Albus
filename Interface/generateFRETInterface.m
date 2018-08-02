@@ -1,4 +1,4 @@
-function varargout = selectFRETInterface(varargin)
+function varargout = generateFRETInterface(varargin)
     if nargin && ischar(varargin{1})
         if nargout
             [varargout{1:nargout}] = feval(str2func(varargin{1}), varargin{2:end});
@@ -77,7 +77,7 @@ function handles = createInterface(handles)
     handles.fret.brightness.JavaPeer.set('HighValue', 1e6);
     handles.fret.brightness.JavaPeer.set('PaintTicks',true);
     handles.fret.brightness.JavaPeer.set('MajorTickSpacing',1e5);
-    handles.fret.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.fret.brightness));
+    handles.fret.brightness.JavaPeer.set('StateChangedCallback', @(~,~) setBrightness(handles.fret.brightness));
     
     % auto brightness and invert box
     handles.fret.autoAndInvertHBox = uix.HBox('Parent', handles.fret.preProcBox);
@@ -112,7 +112,7 @@ function handles = createInterface(handles)
     handles.fret.particleFilter.JavaPeer.set('Maximum', 5e5);
     handles.fret.particleFilter.JavaPeer.set('Minimum', 0);
     handles.fret.particleFilter.JavaPeer.set('Value', 0);
-    handles.fret.particleFilter.JavaPeer.set('MouseReleasedCallback', @(~,~) updateDisplay(handles.fret.particleFilter));
+    handles.fret.particleFilter.JavaPeer.set('StateChangedCallback', @(~,~) updateDisplay(handles.fret.particleFilter));
     % add filter lables
     parFilLabels = java.util.Hashtable();
     parFilLabels.put( int32( 0 ),   javax.swing.JLabel('0') );
@@ -134,7 +134,7 @@ function handles = createInterface(handles)
     handles.fret.particleIntensity.JavaPeer.set('Minimum', 0);
     handles.fret.particleIntensity.JavaPeer.set('LowValue', 9e5);
     handles.fret.particleIntensity.JavaPeer.set('HighValue', 1e6);
-    handles.fret.particleIntensity.JavaPeer.set('MouseReleasedCallback', @(~,~) updateDisplay(handles.fret.particleIntensity));
+    handles.fret.particleIntensity.JavaPeer.set('StateChangedCallback', @(~,~) updateDisplay(handles.fret.particleIntensity));
     
     %% Remove Clusters
     handles.fret.clusterPanel = uix.BoxPanel('Parent', handles.fret.leftPanel,...
@@ -175,7 +175,7 @@ function handles = createInterface(handles)
     handles.fret.eccentricitySlider.JavaPeer.set('Maximum', 1e6);
     handles.fret.eccentricitySlider.JavaPeer.set('Minimum', 0);
     handles.fret.eccentricitySlider.JavaPeer.set('Value', 0);
-    handles.fret.eccentricitySlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setEccentricity(handles.fret.eccentricitySlider, handles.fret.eccentricitySlider.JavaPeer.get('Value')/handles.fret.eccentricitySlider.JavaPeer.get('Maximum')));
+    handles.fret.eccentricitySlider.JavaPeer.set('StateChangedCallback', @(~,~) setEccentricity(handles.fret.eccentricitySlider, handles.fret.eccentricitySlider.JavaPeer.get('Value')/handles.fret.eccentricitySlider.JavaPeer.get('Maximum')));
     % widths
     handles.fret.eccentricityBox.set('Widths', [30, -1]);
     
@@ -197,7 +197,7 @@ function handles = createInterface(handles)
     handles.fret.minDistanceSlider.JavaPeer.set('Maximum', 20e6);
     handles.fret.minDistanceSlider.JavaPeer.set('Minimum', 0);
     handles.fret.minDistanceSlider.JavaPeer.set('Value', 5e6);
-    handles.fret.minDistanceSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setMinDistance(handles.fret.minDistanceSlider,handles.fret.minDistanceSlider.JavaPeer.get('Value')/handles.fret.minDistanceSlider.JavaPeer.get('Maximum')*20));
+    handles.fret.minDistanceSlider.JavaPeer.set('StateChangedCallback', @(~,~) setMinDistance(handles.fret.minDistanceSlider,handles.fret.minDistanceSlider.JavaPeer.get('Value')/handles.fret.minDistanceSlider.JavaPeer.get('Maximum')*20));
     % widths
     handles.fret.minDistanceBox.set('Widths', [30, -1]);
     
@@ -219,7 +219,7 @@ function handles = createInterface(handles)
     handles.fret.edgeDistanceSlider.JavaPeer.set('Maximum', 20e6);
     handles.fret.edgeDistanceSlider.JavaPeer.set('Minimum', 0);
     handles.fret.edgeDistanceSlider.JavaPeer.set('Value', 5e6);
-    handles.fret.edgeDistanceSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setEdgeDistance(handles.fret.edgeDistanceSlider, handles.fret.edgeDistanceSlider.JavaPeer.get('Value')/handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum')*20));
+    handles.fret.edgeDistanceSlider.JavaPeer.set('StateChangedCallback', @(~,~) setEdgeDistance(handles.fret.edgeDistanceSlider, handles.fret.edgeDistanceSlider.JavaPeer.get('Value')/handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum')*20));
     % widths
     handles.fret.edgeDistanceBox.set('Widths', [30, -1]);
     
@@ -323,7 +323,7 @@ function selectSource(hObject,handles)
         case 3 % Import
             handles.fret.importVideoTextbox.Visible = 'on';
             
-            [fileName, fileDir, ~] = uigetfile({'*.tif';'*.tiff';'*.TIF';'*.TIFF'}, 'Select the video file'); % prompt user for file
+            [fileName, fileDir, ~] = uigetfile([getappdata(handles.f,'savePath') '*.tif;*.tiff;*.TIF;*.TIFF'], 'Select the video file'); % prompt user for file
             if fileName ~= 0 % if user does not presses cancel
                 importVideoTextBoxCallback(hObject, [fileDir fileName]);
             else
@@ -415,7 +415,7 @@ function onDisplay(hObject,handles)
     set(handles.axesControl.currentFrame.JavaPeer,'Maximum',size(stack,3));
     set(handles.axesControl.currentFrame.JavaPeer,'Value', getappdata(handles.f,'fret_currentFrame'));
     set(handles.axesControl.currentFrameTextbox,'String', num2str(getappdata(handles.f,'fret_currentFrame')));
-    handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', ...
+    handles.axesControl.currentFrame.JavaPeer.set('StateChangedCallback', ...
         @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
     handles.axesControl.currentFrameTextbox.set('Callback', @(hObject,~) setCurrentFrame( hObject, str2num(hObject.String)));
     handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
@@ -627,8 +627,9 @@ function playVideo(hObject,handles)
     setappdata(handles.f,'Playing_Video',1);
     currentFrame = handles.axesControl.currentFrame.JavaPeer.get('Value');
     while getappdata(handles.f,'Playing_Video')
-        if currentFrame < handles.axesControl.currentFrame.JavaPeer.get('Maximum')
-            currentFrame = currentFrame+1;
+        playSpeed = getappdata(handles.f,'playSpeed');
+        if currentFrame+playSpeed <= handles.axesControl.currentFrame.JavaPeer.get('Maximum')
+            currentFrame = currentFrame+playSpeed;
         else
             currentFrame = 1;
         end

@@ -15,4 +15,4 @@ a = n \ d;
 xCenter     = -0.5*a(1);
 yCenter     = -0.5*a(2);
 width       = sqrt(a(3)/2); 
-amplitude   = exp((a(4)-xc^2-yc^2)/(-2*width^2));
+amplitude   = exp((a(4)-xCenter^2-yCenter^2)/(-2*width^2));

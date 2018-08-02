@@ -1,4 +1,4 @@
-function kymograph = generateKymograph( centerLine, width, seperatedStacks, colors)
+function [kymograph, brightness] = generateKymograph( centerLine, width, seperatedStacks, colors, brightness, sync)
     % two quick checks that the centerLine is valid
     if xy2r(diff(centerLine([1 3])),diff(centerLine([2 4]))) <= 1 % too small for improfile
         kymograph = 0;
@@ -31,9 +31,31 @@ function kymograph = generateKymograph( centerLine, width, seperatedStacks, colo
                 kymLayers{s}(:,(f-1)*width+w) = improfile(seperatedStacks{s}(:,:,f), lines(w,[1 3]), lines(w,[2 4]), layerSize(1), 'bilinear');
             end
         end
+    end
+    
+    % set brightness of each channel
+    if any(brightness == -1)  % used as a flag for autobrightness
+        brightness = zeros(length(seperatedStacks),2);
         
-        % auto adjust brightness
-        kymLayers{s} = imadjust(kymLayers{s});
+        if sync==0
+            for s=1:length(seperatedStacks)
+                brightness(s,:) = stretchlim(kymLayers{s})';
+                kymLayers{s} = imadjust(kymLayers{s}, brightness(s,:));
+            end
+        else
+            for s=1:length(seperatedStacks)
+                brightness(s,:) = stretchlim(kymLayers{s})';
+            end
+            brightnessValues = mean(brightness,1);
+            for s=1:length(seperatedStacks)
+                brightness(s,:) = brightnessValues;
+                kymLayers{s} = imadjust(kymLayers{s}, brightnessValues);
+            end
+        end
+    else
+        for s=1:length(seperatedStacks)
+            kymLayers{s} = imadjust(kymLayers{s}, brightness(s,:));
+        end
     end
     
     % colors each layer and combines them into an RGB image

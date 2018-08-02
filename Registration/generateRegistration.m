@@ -52,7 +52,7 @@ function generateRegistration(hObject,handles)
         % First approximatly transform the the particles in each channel so
         % they are mostly alighed with the first channel using an affine 
         % transformation.
-        [affine_positions, flag] = findAffine(initPositions, positions);
+        [affine_positions, flag] = findAffine(initPositions, positions, 250, size(initPositions,1)/3, mean(size(I))/30);
         if flag % a flag is returned if no transformation was found
             error('Try findAffine with looser parameters');
         end

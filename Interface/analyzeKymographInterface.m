@@ -1,4 +1,4 @@
-function varargout = kymographInterface(varargin)
+function varargout = analyzeKymographInterface(varargin)
     if nargin && ischar(varargin{1})
         if nargout
             [varargout{1:nargout}] = feval(str2func(varargin{1}), varargin{2:end});
@@ -10,7 +10,7 @@ end
 
 %% Creation
 function handles = createInterface(handles)
-    kyms = table(zeros(0,4), cell(0,1), zeros(0,1), zeros(0,1,'logical'), 'VariableNames', {'Position', 'Traces', 'Mark', 'ImageGenerated'});
+    kyms = table(zeros(0,4), cell(0,1), zeros(0,1), zeros(0,1,'logical'), cell(0,1), 'VariableNames', {'Position', 'Traces', 'Mark', 'ImageGenerated', 'Brightness'});
     setappdata(handles.f,'kyms',kyms);
     setappdata(handles.f,'data_kym_images',cell(0));
     setappdata(handles.f,'data_currentDNA',1);
@@ -44,34 +44,34 @@ function handles = createInterface(handles)
     uix.Empty('Parent', handles.kym.widthBox);
     handles.kym.widthBox.set('Widths',[-1 50 50 -1]);
     
-    % Brightness
-    uicontrol( 'Parent', handles.kym.settingsBox,...
-               'Style' , 'text', ...
-               'String', 'Brightness');
-    [~, handles.kym.brightness] = javacomponent('com.jidesoft.swing.RangeSlider');
-    handles.kym.brightness.set('Parent', handles.kym.settingsBox);
-    handles.kym.brightness.JavaPeer.set('Maximum', 1e6);
-    handles.kym.brightness.JavaPeer.set('Minimum', 0);
-    handles.kym.brightness.JavaPeer.set('LowValue', 0);
-    handles.kym.brightness.JavaPeer.set('HighValue', 1e6);
-    handles.kym.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.kym.brightness));
     % auto brightness and invert box
     handles.kym.autoAndInvertHBox = uix.HBox('Parent', handles.kym.settingsBox);
+    % auto brightness
+    handles.kym.autoBrightnessButton = uicontrol('Parent', handles.kym.autoAndInvertHBox,...
+                                                 'String', 'Auto Brightness',...
+                                                 'Callback', @(hObject,~) autoBrightness(hObject, guidata(hObject)));
+    % Sync Brightness
+    handles.kym.syncBrightness = uicontrol(     'Parent', handles.kym.autoAndInvertHBox,...
+                                                'Style', 'checkbox',...
+                                                'String', 'Sync Channels',...
+                                                'Callback', @(hObject,~) setBrightness(hObject, 1));
     % invert
     handles.kym.invertCheckbox = uicontrol(     'Parent', handles.kym.autoAndInvertHBox,...
                                                 'Style', 'checkbox',...
                                                 'String', 'Invert',...
                                                 'Callback', @(hObject,~) setInvert(hObject, guidata(hObject), hObject.Value));
-    % auto brightness
-    handles.kym.autoBrightnessButton = uicontrol('Parent', handles.kym.autoAndInvertHBox,...
-                                                 'String', 'Auto Brightness',...
-                                                 'Callback', @(hObject,~) autoBrightness(hObject, guidata(hObject)));
+    
+                                             
+    uicontrol( 'Parent', handles.kym.settingsBox,...
+               'Style' , 'text', ...
+               'String', 'Brightness');
                                     
     %% selection
     handles.kym.selectionPanel = uix.BoxPanel(  'Parent', handles.kym.leftPanel,...
                                                 'Title','Selection',...
                                                 'Padding',5);
-    handles.kym.selectionBox = uix.VBox('Parent', handles.kym.selectionPanel);
+    handles.kym.selectionBox = uix.VButtonBox('Parent', handles.kym.selectionPanel,...
+                                                'ButtonSize', [200 25]);
     
     % arrows
     handles.kym.arrowsBox = uix.HBox('Parent', handles.kym.selectionBox);
@@ -94,28 +94,48 @@ function handles = createInterface(handles)
                                         'String', '/1',...
                                         'Style', 'text',...
                                         'HorizontalAlignment', 'left');
+    % un/mark all
+    handles.kym.markAllBox = uix.HButtonBox('Parent', handles.kym.selectionBox,...
+                                            'ButtonSize', [80, 25]);
+    
+    uicontrol( 'Parent', handles.kym.markAllBox,...
+               'String', 'Mark All',...
+               'Callback', @(hObject,~) markAllKymographs(hObject,guidata(hObject),true));
+           
+    uicontrol( 'Parent', handles.kym.markAllBox,...
+               'String', 'Unmark All',...
+               'Callback', @(hObject,~) markAllKymographs(hObject,guidata(hObject),false));
+    uicontrol( 'Parent', handles.kym.markAllBox,...
+               'String', 'Invert Marks',...
+               'Callback', @(hObject,~) invertMarks(hObject,guidata(hObject)));
                                     
     %% Delete
-    handles.kym.deletePanel = uix.BoxPanel(  'Parent', handles.kym.leftPanel,...
-                                                'Title','Delete',...
-                                                'Padding',5);
-    handles.kym.deleteBox = uix.VButtonBox('Parent', handles.kym.deletePanel,...
-                                           'ButtonSize', [100 30]);
-    
-    handles.kym.deleteKym = uicontrol(  'Parent', handles.kym.deleteBox,...
-                                        'String', 'DELETE',...
+    handles.kym.deleteKym = uicontrol(  'Parent', handles.kym.selectionBox,...
+                                        'String', 'Delete Current Kymograph',...
                                         'Callback', @(hObject,~) deleteDNA(hObject,guidata(hObject)));
+                                    
+    handles.kym.deleteMarkedKym = uicontrol(  'Parent', handles.kym.selectionBox,...
+                                        'String', 'Delete Marked Kymographs',...
+                                        'Callback', @(hObject,~) deleteMarkedDNA(hObject,guidata(hObject)));
+                                    
+    handles.kym.deleteUnmarkedKym = uicontrol(  'Parent', handles.kym.selectionBox,...
+                                        'String', 'Delete Unmarked Kymographs',...
+                                        'Callback', @(hObject,~) deleteUnmarkedDNA(hObject,guidata(hObject)));
                                     
     %% Exports
     handles.kym.exportPanel = uix.BoxPanel(  'Parent', handles.kym.leftPanel,...
                                              'Title','Export',...
                                              'Padding',5);
-    handles.kym.exportBox = uix.VButtonBox('Parent', handles.kym.exportPanel,...
+    handles.kym.exportBox = uix.HButtonBox('Parent', handles.kym.exportPanel,...
                                            'ButtonSize', [140 30]);
     
     handles.kym.exportAllKyms = uicontrol(  'Parent', handles.kym.exportBox,...
                                             'String', 'Export all kymographs',...
                                             'Callback', @(hObject,~) exportAllKymographs(hObject,guidata(hObject)));
+                                        
+    handles.kym.exportMarkedKyms = uicontrol(  'Parent', handles.kym.exportBox,...
+                                            'String', 'Export marked kymographs',...
+                                            'Callback', @(hObject,~) exportMarkedKymographs(hObject,guidata(hObject)));
                                     
     %% Tracing
     handles.kym.tracePanel = uix.BoxPanel(  'Parent', handles.kym.leftPanel,...
@@ -133,9 +153,6 @@ function handles = createInterface(handles)
     handles.kym.traceTable = uitable(handles.kym.traceBox);
     
     handles.kym.traceBox.set('Heights', [30 300]);
-                                                 
-    %% 
-    handles.kym.leftPanel.set('Heights',[25 120 80 60 60 400]);
     
     
     %% Right panel
@@ -148,7 +165,7 @@ function handles = createInterface(handles)
     handles.kym.dnaPanel    = uix.Panel('Parent', handles.kym.SubVBox);
     
     handles.kym.MainVBox.set('Heights',[200 -1]);
-    handles.kym.HBox.set('Widths',[180 -1]);
+    handles.kym.HBox.set('Widths',[-1 -1]);
     
     %% Video
     % framework
@@ -158,14 +175,24 @@ function handles = createInterface(handles)
     handles.kym.playButton = uicontrol('Parent', handles.kym.vidHBox,...
                                        'String', 'Play',...
                                        'Callback', @(hObject,~) playVideo(hObject,guidata(hObject)));
+    % play speed
+    handles.kym.playSpeed = uicontrol(  'Parent', handles.kym.vidHBox, ...
+                                        'Style','edit',...
+                                        'String','1',...
+                                        'Callback', @(hObject,~) setPlaySpeed(hObject,guidata(hObject),str2double(hObject.String)));
     % slider
     [~, handles.kym.vidCurrentFrame] = javacomponent('javax.swing.JSlider');
     handles.kym.vidCurrentFrame.set('Parent', handles.kym.vidHBox);
     handles.kym.vidCurrentFrame.JavaPeer.set('Maximum', 2);
     handles.kym.vidCurrentFrame.JavaPeer.set('Minimum', 1);
     handles.kym.vidCurrentFrame.JavaPeer.set('Value', 1);
-    handles.kym.vidCurrentFrame.JavaPeer.set('MouseReleasedCallback',...
+    handles.kym.vidCurrentFrame.JavaPeer.set('StateChangedCallback',...
         @(~,~) setVidCurrentFrame(handles.kym.vidCurrentFrame, get(handles.kym.vidCurrentFrame.JavaPeer,'Value')));
+    % frame number
+    handles.kym.currentFrameTextbox = uicontrol(  'Parent', handles.kym.vidHBox, ...
+                                                'Style','edit',...
+                                                'String','1',...
+                                                'Callback', @(hObject,~) setVidCurrentFrame(hObject,str2double(hObject.String)));
     % scroll-able axes
     handles.kym.vidAxesPanel = uipanel('Parent', handles.kym.vidVBox,...
                                        'BorderType', 'none');
@@ -180,7 +207,7 @@ function handles = createInterface(handles)
     handles.kym.vidImline.addNewPositionCallback(@(pos) moveAImline(handles.f,pos));
     handles.kym.vidImline.setColor('red');
     % framework size
-    handles.kym.vidHBox.set('Widths',[50, -1]);
+    handles.kym.vidHBox.set('Widths',[50, 30, -1, 50]);
     handles.kym.vidVBox.set('Heights',[25 -1]);
     vidMagBoxPos = get(handles.kym.vidMagBox,'Position');
     set(handles.kym.vidMagBox,'Position',[0 0 vidMagBoxPos(3) vidMagBoxPos(4)]);
@@ -193,7 +220,7 @@ function handles = createInterface(handles)
     handles.kym.dnaCurrentFrame.JavaPeer.set('Maximum', 2);
     handles.kym.dnaCurrentFrame.JavaPeer.set('Minimum', 1);
     handles.kym.dnaCurrentFrame.JavaPeer.set('Value', 1);
-    handles.kym.dnaCurrentFrame.JavaPeer.set('MouseReleasedCallback',...
+    handles.kym.dnaCurrentFrame.JavaPeer.set('StateChangedCallback',...
         @(~,~) setDnaCurrentFrame(handles.kym.dnaCurrentFrame, get(handles.kym.dnaCurrentFrame.JavaPeer,'Value')));
     % scroll-able axes
     handles.kym.dnaAxesPanel = uipanel('Parent', handles.kym.dnaBox,...
@@ -239,40 +266,24 @@ function handles = createInterface(handles)
     
     % table
     handles.kym.table = uitable(handles.kym.tablePanel,...
-                                'CellSelectionCallback', @(hObject,eventdata) tableCallback(hObject,eventdata,guidata(hObject)));
+                                'ColumnName',{'Length','Position (x1, y1, x2, y2)','Marked'},...
+                                'ColumnEditable', [false, false, true],...
+                                'CellEditCallback', @(hObject,eventdata) tableEditCallback(hObject,eventdata,guidata(hObject)),...
+                                'CellSelectionCallback', @(hObject,eventdata) tableSelectionCallback(hObject,eventdata,guidata(hObject)));
+                            
+                            
 end
 
 %% Updates
 function handles = loadFromSession(hObject,handles,session)
     handles.kym.invertCheckbox.Value = session.kym_invertImage;
-    set(handles.kym.brightness.JavaPeer, 'LowValue', session.kym_lowBrightness);
-    set(handles.kym.brightness.JavaPeer, 'HighValue', session.kym_highBrightness);
-end
-            
-function getDataFromSelectedDNA(hObject, handles)
-    hWaitBar = waitbar(0,'Generating kymographs...', 'WindowStyle', 'modal');
+    handles.kym.syncBrightness.Value = session.kym_syncBrightness;
+    
+    handles = createBrightnessSliders(hObject, handles);
     
     kyms = getappdata(handles.f,'kyms');
-    
-    %% generate all the kymograph images
-    if getappdata(handles.f,'isMapped')
-        seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
-        colors = getappdata(handles.f,'colors');
-    else
-        seperatedStacks = {getappdata(handles.f,'data_video_stack')};
-        colors = [1 1 1];
-    end
-    width = str2num(handles.kym.widthTextbox.String);
-    numDNA = size(kyms,1);
-    
-    kyms_images = generateAllKymographs(kyms.Position, width , seperatedStacks, colors);
-    
-    setappdata(handles.f,'data_kym_images',kyms_images);
-    
-    %% fill table
-    updateTable(hObject,handles);
-    
-    delete(hWaitBar);
+    kyms.ImageGenerated = zeros(size(kyms.ImageGenerated),'logical');
+    setappdata(handles.f,'kyms',kyms);
 end
 
 function onDisplay(hObject,handles)
@@ -282,28 +293,41 @@ function onDisplay(hObject,handles)
     if handles.dna.sourceTimeAvgCheckBox.Value
         set(handles.kym.dnaCurrentFrame,'Visible','off');
     else
-        dnaStack = selectDNAInterface('getSourceStack',hObject,handles);
+        dnaStack = generateKymographInterface('getSourceStack',hObject,handles);
         dnaMax = size(dnaStack,3);
         set(handles.kym.dnaCurrentFrame.JavaPeer,'Maximum',dnaMax);
         set(handles.kym.dnaCurrentFrame.JavaPeer,'Value', getappdata(handles.f,'dna_currentFrame'));
         set(handles.kym.dnaCurrentFrame,'Visible','on');
     end
-    vidStack = getappdata(handles.f,'data_video_stack');
-    vidMax = size(vidStack,3);
-    set(handles.kym.vidCurrentFrame.JavaPeer,'Maximum',vidMax);
+    
+    if getappdata(handles.f,'isMapped')
+        seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
+        vidSize = size(seperatedStacks{1},3);
+    else
+        stack = getappdata(handles.f,'data_video_stack');
+        vidSize = size(stack,3);
+    end
+    
+    set(handles.kym.vidCurrentFrame.JavaPeer,'Maximum',vidSize);
     set(handles.kym.vidCurrentFrame.JavaPeer,'Value', getappdata(handles.f,'home_currentFrame'));
     set(handles.kym.vidCurrentFrame,'Visible','on');
     
-    % updates
-    getDataFromSelectedDNA(hObject, handles);
+    %% setup brightness sliders
+    handles = createBrightnessSliders(hObject, handles);
+    
+    %% updates
+    generateAllKymographs(hObject,handles);% generate all the kymograph images    
+    updateTable(hObject,handles);% fill table
     updateMaxDNA(hObject,handles);
     selectDNA(hObject,handles,1);
     
     % key presses, these get turned off by onRelease
-    set(handles.f,'KeyPressFcn',@keyPressCallback);
+    set(handles.f,'WindowKeyPressFcn',@keyPressCallback);
     
     handles.rightPanel.Selection = 2;
     handles.rightPanel.Visible = 'on';
+    
+    guidata(hObject, handles);
 end
 
 function onRelease(hObject,handles)
@@ -314,16 +338,24 @@ function onRelease(hObject,handles)
     end
     
     % update any changes that result from Imline moves
-    refreshKymAxes(hObject,handles);
+    if handles.kym.kymPanel.Selection == 2
+        refreshKymAxes(hObject,handles);
+    end
+    
     
     % key presses, these get turned on by onDisplay
-    set(handles.f,'KeyPressFcn','');
+    set(handles.f,'WindowKeyPressFcn','');
     
     homeInterface('openSelectDNA',hObject);
 end
 
 function setVidCurrentFrame(hObject,value)
     handles = guidata(hObject);
+    
+    handles.kym.vidCurrentFrame.JavaPeer.set('Value', value);
+    value = handles.kym.vidCurrentFrame.JavaPeer.get('Value');
+    
+    handles.kym.currentFrameTextbox.String = num2str(value);
     setappdata(handles.f,'home_currentFrame',value);
     selectDNA(hObject, handles, getappdata(handles.f,'data_currentDNA'));
 end
@@ -336,46 +368,133 @@ end
 
 function updateTable(hObject,handles)
     kyms = getappdata(handles.f,'kyms');
-    handles.kym.table.Data = xy2rdiff(kyms.Position(:,[1 3]), kyms.Position(:,[2 4]));
+    
+    lengths     = round(xy2rdiff(kyms.Position(:,[1 3]), kyms.Position(:,[2 4])));
+    positions   = round(kyms.Position);
+    marked      = kyms.Mark==1;
+        
+    tableData = horzcat(cellstr(num2str(lengths,'%5i\n')),...
+                        cellstr(num2str(positions,'%5i, %5i, %5i, %5i\n')),...
+                        num2cell(marked));
+    handles.kym.table.Data = tableData;
 end
 
 %% Brightness Callbacks
-function setBrightness(hObject)
+function setBrightness(hObject,c)
     handles = guidata(hObject);
-    lowBrightness = get(handles.kym.brightness.JavaPeer,'LowValue');
-    highBrightness = get(handles.kym.brightness.JavaPeer,'HighValue');
+    hWaitBar = waitbar(0,'Loading ... ');
+    
+    % update the slider
+    jc = getfield(handles, ['kymBrightness', num2str(c)]);
+    lowBrightness = jc.JavaPeer.get('LowValue');
+    highBrightness = jc.JavaPeer.get('HighValue');        
     if lowBrightness==highBrightness
         if lowBrightness==0
-            set(handles.kym.brightness.JavaPeer,'HighValue',highBrightness+1)
+            highBrightness = highBrightness+1;
+            set(jc.JavaPeer,'HighValue',highBrightness)
         else
-            set(handles.kym.brightness.JavaPeer,'LowValue',lowBrightness-1)
+            lowBrightness = lowBrightness-1;
+            set(jc.JavaPeer,'LowValue',lowBrightness)
         end
     end
+    handles = setfield(handles, ['kymBrightness', num2str(c)], jc);
+        
+    % get the current kymograph
+    row = getappdata(handles.f,'data_currentDNA');
+    kyms = getappdata(handles.f,'kyms');
+    width = str2num(handles.kym.widthTextbox.String);
+    sync = handles.kym.syncBrightness.Value;
+    kymImages = getappdata(handles.f,'data_kym_images');
+    if getappdata(handles.f,'isMapped')
+        seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
+        colors = getappdata(handles.f,'colors');
+    else
+        seperatedStacks = {getappdata(handles.f,'data_video_stack')};
+        colors = [1 1 1];
+    end
     
-    selectDNA(hObject, handles, getappdata(handles.f,'data_currentDNA'));
+    % sync brightness if applicalble
+    if handles.kym.syncBrightness.Value
+        numChannels = size(getappdata(handles.f,'ROI'),1);
+        for i=1:numChannels
+            jc = getfield(handles, ['kymBrightness', num2str(i)]);
+            jc.JavaPeer.set('LowValue', lowBrightness);
+            jc.JavaPeer.set('HighValue', highBrightness);        
+            handles = setfield(handles, ['kymBrightness', num2str(i)], jc); 
+            
+            kyms.Brightness{row}(i,1) = lowBrightness/jc.JavaPeer.get('Maximum');
+            kyms.Brightness{row}(i,2) = highBrightness/jc.JavaPeer.get('Maximum');
+        end
+    else
+        kyms.Brightness{row}(c,1) = jc.JavaPeer.get('LowValue')/jc.JavaPeer.get('Maximum');
+        kyms.Brightness{row}(c,2) = jc.JavaPeer.get('HighValue')/jc.JavaPeer.get('Maximum');
+    end
+
+    % generate new image and update values
+    kyms.Position(row,1:4) = reshape(getPosition(handles.kym.vidImline)',1,[]);
+    kyms.ImageGenerated(row) = true;  
+    
+    kymImages{row} = generateKymograph(kyms.Position(row,1:4), width , seperatedStacks, colors, kyms.Brightness{row}, sync);
+    
+    % save values
+    setappdata(handles.f,'kyms',kyms);
+    setappdata(handles.f,'data_kym_images',kymImages);    
+    guidata(handles.f,handles);
+    
+    % update the displayed image
+    selectDNA(hObject, handles, row);
+    updateTable(hObject,handles);
+    
+    delete(hWaitBar);
 end
 
 function autoBrightness(hObject, handles)
+    hWaitBar = waitbar(0,'Loading ... ');
+
     % get the current kymograph
     row = getappdata(handles.f,'data_currentDNA');
+    kyms = getappdata(handles.f,'kyms');
+    width = str2num(handles.kym.widthTextbox.String);
+    sync = handles.kym.syncBrightness.Value;
     kymImages = getappdata(handles.f,'data_kym_images');
-    I = kymImages{row};
+    if getappdata(handles.f,'isMapped')
+        seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
+        colors = getappdata(handles.f,'colors');
+    else
+        seperatedStacks = {getappdata(handles.f,'data_video_stack')};
+        colors = [1 1 1];
+    end
+    
+    % change values
+    kyms.Position(row,1:4) = reshape(getPosition(handles.kym.vidImline)',1,[]);
+    [kymImages{row}, brightness] = generateKymograph(kyms.Position(row,1:4), width , seperatedStacks, colors, -1, sync); % -1 is for auto brightness
+    kyms.ImageGenerated(row) = true;  
+    kyms.Brightness{row} = brightness;
     
     % invert the image as requested
     if handles.kym.invertCheckbox.Value
-        I = imcomplement(I);
-    end
-
-    % calculate auto brightness
-    autoImAdjust = stretchlim(I);
-
+        kymImages{row} = imcomplement(kymImages{row});
+    end   
+    
     % set the brightness sliders
-    autoImAdjust = round(autoImAdjust * get(handles.kym.brightness.JavaPeer,'Maximum'));
-    set(handles.kym.brightness.JavaPeer,'LowValue',autoImAdjust(1));
-    set(handles.kym.brightness.JavaPeer,'HighValue',autoImAdjust(2));
-
+    numChannels = size(getappdata(handles.f,'ROI'),1);
+    for c=1:numChannels
+        jc = getfield(handles, ['kymBrightness', num2str(c)]);
+        jc.JavaPeer.set('LowValue',  brightness(c,1)*get(handles.kymBrightness1.JavaPeer,'Maximum'));
+        jc.JavaPeer.set('HighValue', brightness(c,2)*get(handles.kymBrightness1.JavaPeer,'Maximum'));        
+        handles = setfield(handles, ['kymBrightness', num2str(c)], jc); 
+    end
+    
+    % save values
+    setappdata(handles.f,'kyms',kyms);
+    setappdata(handles.f,'data_kym_images',kymImages);
+    guidata(handles.f,handles);
+    
     % update the displayed image
-    selectDNA(hObject, handles, getappdata(handles.f,'data_currentDNA'));
+    selectDNA(hObject, handles, row);
+    updateTable(hObject,handles);
+    
+    delete(hWaitBar);
 end
 
 function setInvert(hObject, handles, value)
@@ -383,23 +502,76 @@ function setInvert(hObject, handles, value)
     autoBrightness(hObject,handles); % this will also update the display
 end
 
+function handles = createBrightnessSliders(hObject, handles)
+    colors =        getappdata(handles.f,'colors');
+    names =         getappdata(handles.f,'ROINames');
+    numChannels =   size(getappdata(handles.f,'ROI'),1);
+    
+    for c=1:numChannels
+        if ~isfield(handles, ['kymBrightness', num2str(c)])
+            % hbox
+            box = uix.HBox('Parent', handles.kym.settingsBox, 'Spacing', 5);
+                        
+            % label
+            label = uicontrol(  'Parent', box, ...
+                                'Style', 'text', ...
+                                'String', '#####');
+            handles = setfield(handles, ['kymBrightnessLabel', num2str(c)], label);
+            
+            % slider
+            [~, jc] = javacomponent('com.jidesoft.swing.RangeSlider');
+            jc.set('Parent', box);
+            jc.JavaPeer.set('Maximum', 1e6);
+            jc.JavaPeer.set('Minimum', 0);
+            jc.JavaPeer.set('LowValue', 0);
+            jc.JavaPeer.set('HighValue', 1e6);
+            jc.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.f,c));
+            handles = setfield(handles, ['kymBrightness', num2str(c)], jc);
+            
+            % set widths
+            box.set('Widths',[-1 -4]);
+            handles = setfield(handles, ['kymBrightnessBox', num2str(c)], box);
+        end
+        
+        label = getfield(handles, ['kymBrightnessLabel' num2str(c)]);
+        label.String = names{c};
+        label.ForegroundColor = colors(c,:);
+        handles = setfield(handles, ['kymBrightnessLabel', num2str(c)], label);
+    end
+    
+    settingsHeight = [[20 25 15] 25*ones(1,numChannels)];
+    handles.kym.settingsBox.set('Heights',settingsHeight);
+    settingPanelHeight = sum(settingsHeight) + 30;
+    handles.kym.leftPanel.set('Heights',[25 settingPanelHeight 175 60 370]);
+end
+
 %% DNA Selection
-function tableCallback(hObject,eventdata,handles)
+function tableEditCallback(hObject,eventdata,handles)
     if size(eventdata.Indices,1) == 0
         return;
     end
     
     row = eventdata.Indices(1);
-    selectDNA(hObject,handles,row)
+    selectDNA(hObject,handles,row);
+    
+    kyms = getappdata(handles.f,'kyms');
+    kyms.Mark = double([hObject.Data{:,3}]');
+    setappdata(handles.f,'kyms',kyms);
+    guidata(hObject,handles);
+end
+
+function tableSelectionCallback(hObject,eventdata,handles)
+    if size(eventdata.Indices,1) == 0
+        return;
+    end
+    
+    row = eventdata.Indices(1);
+    selectDNA(hObject,handles,row);
 end
 
 function selectDNA(hObject, handles, row)
     % save positions of current Traces
     saveImpolysToTraces(hObject,handles);
-    
-    if getappdata(handles.f,'Playing_Video')
-        pauseVideo(hObject,handles);
-    end
     
     if handles.kym.kymPanel.Selection == 2
         refreshKymAxes(hObject,handles); % recalls selectDNA
@@ -411,19 +583,30 @@ function selectDNA(hObject, handles, row)
     
     kyms = getappdata(handles.f,'kyms');
     kymImages = getappdata(handles.f,'data_kym_images');
-    lowBrightness = get(handles.kym.brightness.JavaPeer,'LowValue')/get(handles.kym.brightness.JavaPeer,'Maximum');
-    highBrightness = get(handles.kym.brightness.JavaPeer,'HighValue')/get(handles.kym.brightness.JavaPeer,'Maximum');
+    if isempty(kymImages)
+        return;
+    end
+        
+    % set brightness
+    numChannels = size(getappdata(handles.f,'ROI'),1);
+    for c=1:numChannels
+        brightness = kyms.Brightness{row};
+        jc = getfield(handles, ['kymBrightness', num2str(c)]);
+        jc.JavaPeer.set('LowValue',  brightness(c,1)*get(handles.kymBrightness1.JavaPeer,'Maximum'));
+        jc.JavaPeer.set('HighValue', brightness(c,2)*get(handles.kymBrightness1.JavaPeer,'Maximum'));        
+        handles = setfield(handles, ['kymBrightness', num2str(c)], jc); 
+    end
+    
     kymI = kymImages{row};
     if handles.kym.invertCheckbox.Value
         kymI = imcomplement(kymI);
     end
-    kymI = imadjust(kymI, [lowBrightness highBrightness]);
     
     % kymograph
     handles.kym.kymAxesAPI.replaceImage(kymI,'PreserveView',true);
     
     % dna
-    handles.kym.dnaAxesAPI.replaceImage(selectDNAInterface('getCurrentImage',hObject,handles),'PreserveView',true);
+    handles.kym.dnaAxesAPI.replaceImage(generateKymographInterface('getCurrentImage',hObject,handles),'PreserveView',true);
     
     % video
     handles.kym.vidAxesAPI.replaceImage(homeInterface('getCurrentOneAxesImage',hObject,handles),'PreserveView',true);
@@ -439,6 +622,7 @@ function selectDNA(hObject, handles, row)
     
     % traces
     resetTraceGraphics(hObject,handles);
+    guidata(hObject,handles);
 end
 
 function prevDNA(hObject,handles)
@@ -485,6 +669,20 @@ function updateMaxDNA(hObject,handles)
     handles.kym.maxDNAText.String = ['/' num2str(max_kyms)];
 end
 
+function markAllKymographs(hObject,handles,mark)
+    kyms = getappdata(handles.f,'kyms');
+    kyms.Mark = repmat(mark,size(kyms,1),1);
+    setappdata(handles.f,'kyms',kyms);
+    updateTable(hObject,handles);
+end
+
+function invertMarks(hObject,handles)
+    kyms = getappdata(handles.f,'kyms');
+    kyms.Mark = ~kyms.Mark;
+    setappdata(handles.f,'kyms',kyms);
+    updateTable(hObject,handles);
+end
+
 %% Delete DNA
 function deleteDNA(hObject,handles)
     c = getappdata(handles.f,'data_currentDNA');
@@ -512,6 +710,50 @@ function deleteDNA(hObject,handles)
     selectDNA(hObject, handles, c);
 end
 
+function deleteMarkedDNA(hObject,handles)
+    % get
+    kyms        = getappdata(handles.f,'kyms');
+    kymImages   = getappdata(handles.f,'data_kym_images');
+
+    rmIndexs = (kyms.Mark == 1);
+    
+    kymImages(rmIndexs) = [];
+    kyms(rmIndexs,:) = [];
+    
+    setappdata(handles.f,'data_kym_images',kymImages);
+    setappdata(handles.f,'kyms',kyms);
+    
+    % update table
+    updateTable(hObject,handles);
+
+    % update total DNA count
+    updateMaxDNA(hObject,handles);
+
+    selectDNA(hObject, handles, 1);
+end
+
+function deleteUnmarkedDNA(hObject,handles)
+    % get
+    kyms        = getappdata(handles.f,'kyms');
+    kymImages   = getappdata(handles.f,'data_kym_images');
+
+    rmIndexs = (kyms.Mark == 0);
+    
+    kymImages(rmIndexs) = [];
+    kyms(rmIndexs,:) = [];
+    
+    setappdata(handles.f,'data_kym_images',kymImages);
+    setappdata(handles.f,'kyms',kyms);
+    
+    % update table
+    updateTable(hObject,handles);
+
+    % update total DNA count
+    updateMaxDNA(hObject,handles);
+
+    selectDNA(hObject, handles, 1);
+end
+
 %% DNA Imline change
 function moveAImline(hObject,pos)
     handles = guidata(hObject);
@@ -520,6 +762,10 @@ function moveAImline(hObject,pos)
     handles.kym.vidImline.setPosition(pos);
     
     handles.kym.kymPanel.Selection = 2;
+    
+    kyms = getappdata(handles.f,'kyms');
+    kyms.ImageGenerated(hObject.UserData) = false;
+    setappdata(handles.f,'kyms',kyms);
 end
 
 function refreshKymAxes(hObject,handles)
@@ -528,6 +774,7 @@ function refreshKymAxes(hObject,handles)
     kyms = getappdata(handles.f,'kyms');
     kymImages = getappdata(handles.f,'data_kym_images');
     width = str2num(handles.kym.widthTextbox.String);
+    sync = handles.kym.syncBrightness.Value;
     if getappdata(handles.f,'isMapped')
         seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
         colors = getappdata(handles.f,'colors');
@@ -538,7 +785,8 @@ function refreshKymAxes(hObject,handles)
     
     % change values
     kyms.Position(i,1:4) = reshape(getPosition(handles.kym.vidImline)',1,[]);
-    kymImages{i} = generateKymograph(kyms.Position(i,1:4), width , seperatedStacks, colors);
+    kymImages{i} = generateKymograph(kyms.Position(i,1:4), width , seperatedStacks, colors, -1, sync); % -1 is for auto brightness
+    kyms.ImageGenerated(i) = true;
     
     % save values
     setappdata(handles.f,'kyms',kyms);
@@ -566,8 +814,9 @@ function playVideo(hObject,handles)
     
     currentFrame = getappdata(handles.f,'home_currentFrame');
     while getappdata(handles.f,'Playing_Video')
-        if currentFrame < handles.kym.vidCurrentFrame.JavaPeer.get('Maximum')
-            currentFrame = currentFrame+1;
+        playSpeed = getappdata(handles.f,'playSpeed');
+        if currentFrame+playSpeed <= handles.kym.vidCurrentFrame.JavaPeer.get('Maximum')
+            currentFrame = currentFrame+playSpeed;
         else
             currentFrame = 1;
         end
@@ -587,6 +836,15 @@ function pauseVideo(hObject,handles)
     setappdata(handles.f,'Playing_Video',0);
 end
 
+function setPlaySpeed(hObject, handles, value)
+    value = min(value,100);
+    value = max(value,1);
+    
+    setappdata(handles.f, 'playSpeed', value);
+    handles.kym.playSpeed.String = num2str(value);
+    handles.axesControl.playSpeed.String = num2str(value);
+end
+
 %% Export
 function exportAllKymographs(hObject,handles)
     % make sure the kyms data is uptodate
@@ -595,15 +853,6 @@ function exportAllKymographs(hObject,handles)
     % get data
     kyms        = getappdata(handles.f,'kyms');
     kymImages   = getappdata(handles.f,'data_kym_images');
-    colors      = getappdata(handles.f,'colors');
-    width = str2num(handles.kym.widthTextbox.String);
-    if getappdata(handles.f,'isMapped')
-        seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
-        colors = getappdata(handles.f,'colors');
-    else
-        seperatedStacks = {getappdata(handles.f,'data_video_stack')};
-        colors = [1 1 1];
-    end
     
     % ask user for location and make a kymographs directory inside
     savePath = uigetdir();
@@ -617,9 +866,40 @@ function exportAllKymographs(hObject,handles)
     
     % save kymographs to directory
     for i=1:size(kyms,1)
-        I = generateKymograph(kyms.Position(i,1:4), width , seperatedStacks, colors);
+        I = kymImages{i};
         imwrite(I, [savePath '/kymographs/' num2str(i) '.tif'],'tif');
         waitbar(i/size(kyms,1));
+    end
+    
+    % close waitbar
+    delete(hWaitBar);
+end
+
+function exportMarkedKymographs(hObject,handles)
+    % make sure the kyms data is uptodate
+    refreshKymAxes(hObject,handles);
+
+    % get data
+    kyms        = getappdata(handles.f,'kyms');
+    kymImages   = getappdata(handles.f,'data_kym_images');
+    
+    % ask user for location and make a kymographs directory inside
+    savePath = uigetdir();
+    if savePath==0 % if user presses cancle
+        return
+    end
+    mkdir([savePath '/kymographs/']);
+    
+    % set up waitbar
+    hWaitBar = waitbar(0,'Exporting kymographs...', 'WindowStyle', 'modal');
+    
+    % save kymographs to directory
+    for i=1:sum(kyms.Mark)
+        if kyms.Mark == 1
+            I = kymImages{i};
+            imwrite(I, [savePath '/kymographs/' num2str(i) '.tif'],'tif');
+            waitbar(i/sum(kyms.Mark));
+        end
     end
     
     % close waitbar

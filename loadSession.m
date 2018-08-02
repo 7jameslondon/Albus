@@ -7,15 +7,52 @@ function flag = loadSession(hObject)
         return;
     end
     hWaitBar = waitbar(0,'Loading in session...', 'WindowStyle', 'modal');
-    load([loadPath loadName]);
+    setappdata(handles.f,'isLoading',true);
+    load([loadPath loadName]);    
     
     %% Handles changes from old versions 0.44 and forward
+    if ~isfield(session,'playSpeed')
+        session.playSpeed = 1;
+    end
+    if ~isfield(session,'flow_trackingDistance')
+        session.flow_mode            = getappdata(handles.f,'flow_mode');
+        session.flow_currentFrame    = 1;
+        session.flow_invertImage     = false;
+        session.flow_lowBrightness   = 0;
+        session.flow_highBrightness  = 1;
+        session.flow_timeAvg         = false;
+
+        session.flow_particleIntensityLow   = 100;
+        session.flow_particleIntensityHigh  = 100;
+        session.flow_particleFilter         = 1;
         
+        session.flow_trackingDistance       = 2;
+        
+        session.flow_backgroundFilePath = 'No background video selected';
+        
+        session.flowStrechingProfiles = table; 
+    end
+    if ~isfield(session,'kym_lowBrightness1')    
+        session.kym_lowBrightness1 = 100;
+        session.kym_lowBrightness2 = 100;
+        session.kym_lowBrightness3 = 100;
+        session.kym_lowBrightness4 = 100;
+        session.kym_lowBrightness5 = 100;
+        session.kym_lowBrightness6 = 100;
+        
+        session.kym_highBrightness1 = 101;
+        session.kym_highBrightness2 = 101;
+        session.kym_highBrightness3 = 101;
+        session.kym_highBrightness4 = 101;
+        session.kym_highBrightness5 = 101;
+        session.kym_highBrightness6 = 101;
+    end
     
     
     %% Setup general variables
     setappdata(handles.f,'version',session.version);
-    setappdata(handles.f,'autoSavePath',session.autoSavePath);
+    setappdata(handles.f,'autoSavePath', [loadPath loadName]);
+    %setappdata(handles.f,'autoSavePath',session.autoSavePath);
     setappdata(handles.f,'savePath',session.savePath);
     setappdata(handles.f,'ROI',session.ROI); % ROI will each get updated by updateDisplay calls in the GUIs
     setappdata(handles.f,'colors',session.colors);
@@ -25,6 +62,7 @@ function flag = loadSession(hObject)
     setappdata(handles.f,'drift',session.drift);
     setappdata(handles.f,'kyms',session.kyms);
     setappdata(handles.f,'combinedROIMask',session.combinedROIMask);
+    createInterface('setPlaySpeed',hObject, handles, session.playSpeed);
     if isfield(session,'displacmentFields') ~= 0
         setappdata(handles.f,'displacmentFields',session.displacmentFields);
     end
@@ -48,10 +86,11 @@ function flag = loadSession(hObject)
     waitbar(3/5,hWaitBar)
     
     %% Setup all the other interfaces
-    handles = selectDNAInterface('loadFromSession', hObject,handles,session);
-    handles = selectFRETInterface('loadFromSession', hObject,handles,session);
-    handles = tracesInterface('loadFromSession', hObject,handles,session);
-    handles = kymographInterface('loadFromSession',hObject,handles,session);
+    handles = generateKymographInterface('loadFromSession', hObject,handles,session);
+    handles = generateFRETInterface('loadFromSession', hObject,handles,session);
+    handles = analyzeFRETInterface('loadFromSession', hObject,handles,session);
+    handles = analyzeKymographInterface('loadFromSession',hObject,handles,session);
+    handles = generateFlowStrechingInterface('loadFromSession',hObject,handles,session);
     waitbar(4/5,hWaitBar)
     
     %% Move to correct interface
@@ -61,15 +100,19 @@ function flag = loadSession(hObject)
         case 'Mapping'
             homeInterface('openMapping',hObject);
         case 'Video Settings'
-            homeInterface('openVideoSettings',hObject);
+            homeInterface('openVideoSettings',hObject);d
         case 'Select DNA'
             homeInterface('openSelectDNA',hObject);
         case 'Kymographs'
-            selectDNAInterface('openKymographs',hObject,handles,1); % 1 is a flag to suppress dna_linePos appdata overide
+            generateKymographInterface('openKymographs',hObject,handles,1); % 1 is a flag to suppress dna_linePos appdata overide
         case 'Select FRET'
             homeInterface('openSelectFRET',hObject);
         case 'Traces'
-            selectFRETInterface('openTraces',hObject,0,1); % 0, is to stop handles, 1 is a flag to suppress recalculation of trace data
+            generateFRETInterface('openTraces',hObject,0,1); % 0, is to stop handles, 1 is a flag to suppress recalculation of trace data
+        case 'Generate Flow Streching'
+            homeInterface('openGenerateFlowStreching',hObject);
+        case 'Analyze Flow Streching'
+            generateFlowStrechingInterface('openAnalyzeFlowStreching',hObject);
     end
     handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag());
     
@@ -86,6 +129,7 @@ function flag = loadSession(hObject)
     guidata(handles.f,handles); % save
     
     %% Exit
+    setappdata(handles.f,'isLoading',false);
     waitbar(5/5,hWaitBar)
     delete(hWaitBar);
 end

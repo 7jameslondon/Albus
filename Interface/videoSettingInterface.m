@@ -70,7 +70,7 @@ function handles = createInterface(handles)
     handles.vid.brightness.JavaPeer.set('HighValue', 1e6);
     handles.vid.brightness.JavaPeer.set('PaintTicks',true);
     handles.vid.brightness.JavaPeer.set('MajorTickSpacing',1e5);
-    handles.vid.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.vid.brightness));
+    handles.vid.brightness.JavaPeer.set('StateChangedCallback', @(~,~) setBrightness(handles.vid.brightness));
     
     % auto brightness
     handles.vid.autoBrightnessButton = uicontrol(  'Parent', handles.vid.editBox,...
@@ -88,7 +88,7 @@ function handles = createInterface(handles)
     handles.vid.cutting.JavaPeer.set('LowValue', 1);
     handles.vid.cutting.JavaPeer.set('HighValue', 2);
     handles.vid.cutting.JavaPeer.set('PaintTicks',true);
-    handles.vid.cutting.JavaPeer.set('MouseReleasedCallback', @(~,~) setCutting(handles.vid.cutting));
+    handles.vid.cutting.JavaPeer.set('StateChangedCallback', @(~,~) setCutting(handles.vid.cutting));
     
     handles.vid.editBox.set('Heights',[25 25 25 25 25 25 ]);
 
@@ -101,7 +101,8 @@ end
 
 %% Select File Callback
 function selectVideoFileButtonCallback(hObject)
-    [fileName, fileDir, ~] = uigetfile({'*.tif';'*.tiff';'*.TIF';'*.TIFF'}, 'Select the video file'); % prompt user for file
+    handles = guidata(hObject);
+    [fileName, fileDir, ~] = uigetfile([getappdata(handles.f,'savePath') '*.tif;*.tiff;*.TIF;*.TIFF'], 'Select the video file'); % prompt user for file
     if fileName ~= 0 % if user does not presses cancel
         selectVideoFileTextBoxCallback(hObject, [fileDir fileName]);
     end
@@ -167,7 +168,7 @@ function handles = loadFromSession(hObject,handles,session)
     if stack==0 % the file could not be located
         uiwait(msgbox('The original video file could not be found. Please locate the new location of the video and select it.'));
         
-        [fileName, fileDir, ~] = uigetfile({'*.tif';'*.tiff';'*.TIF';'*.TIFF'}, 'Select the video file'); % prompt user for file
+        [fileName, fileDir, ~] = uigetfile([getappdata(handles.f,'savePath') '*.tif;*.tiff;*.TIF;*.TIFF'], 'Select the video file'); % prompt user for file
         if fileName ~= 0 % if user does not presses cancel
             handles = setVideoFile(hObject, handles, [fileDir fileName]);
         else
@@ -221,6 +222,14 @@ end
 %% Brightness Callbacks
 function setBrightness(hObject)
     handles = guidata(hObject);
+    if getappdata(handles.f,'isLoading')
+        if getappdata(handles.f,'isMapped')
+            if ~isappdata(handles.f,'data_video_originalSeperatedStacks')
+                return;
+            end
+        end
+    end
+    
     lowBrightness = get(handles.vid.brightness.JavaPeer,'LowValue');
     highBrightness = get(handles.vid.brightness.JavaPeer,'HighValue');
     if lowBrightness==highBrightness
@@ -270,6 +279,14 @@ end
 
 function setCutting(hObject)
     handles = guidata(hObject);
+    if getappdata(handles.f,'isLoading')
+        if getappdata(handles.f,'isMapped')
+            if ~isappdata(handles.f,'data_video_originalSeperatedStacks')
+                return;
+            end
+        end
+    end
+    
     updateDisplay(hObject,handles);
 end
 
@@ -283,8 +300,9 @@ function playVideo(hObject,handles)
     setappdata(handles.f,'Playing_Video',1);
     currentFrame = handles.axesControl.currentFrame.JavaPeer.get('Value');
     while getappdata(handles.f,'Playing_Video')
-        if currentFrame < handles.axesControl.currentFrame.JavaPeer.get('Maximum')
-            currentFrame = currentFrame+1;
+        playSpeed = getappdata(handles.f,'playSpeed');
+        if currentFrame+playSpeed <= handles.axesControl.currentFrame.JavaPeer.get('Maximum')
+            currentFrame = currentFrame+playSpeed;
         else
             currentFrame = 1;
         end
@@ -360,6 +378,11 @@ function I = getCurrentOneAxesImage(hObject,handles)
         colors = getappdata(handles.f,'colors');
         seperatedStacks = getappdata(handles.f,'data_video_originalSeperatedStacks');
         
+        if isempty(seperatedStacks)
+            I = 0;
+            return;
+        end
+        
         seperatedFrames = cell(length(seperatedStacks),1); % pre-aloc
         for i=1:length(seperatedStacks)
             % current frame
@@ -381,6 +404,11 @@ function I = getCurrentOneAxesImage(hObject,handles)
         lowBrightness = get(handles.vid.brightness.JavaPeer,'LowValue')/get(handles.vid.brightness.JavaPeer,'Maximum');
         highBrightness = get(handles.vid.brightness.JavaPeer,'HighValue')/get(handles.vid.brightness.JavaPeer,'Maximum');
         stack = getappdata(handles.f,'data_video_originalStack');
+        
+        if isempty(stack)
+            I = 0;
+            return;
+        end
         
         % current frame
         I = stack(:,:,curretFrame);
@@ -467,7 +495,7 @@ function onDisplay(hObject,handles)
     set(handles.axesControl.currentFrame.JavaPeer,'Maximum',size(stack,3));
     set(handles.axesControl.currentFrame.JavaPeer,'Value', getappdata(handles.f,'video_currentFrame'));
     set(handles.axesControl.currentFrameTextbox,'String', num2str(getappdata(handles.f,'video_currentFrame')));
-    handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
+    handles.axesControl.currentFrame.JavaPeer.set('StateChangedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
     handles.axesControl.currentFrameTextbox.set('Callback', @(hObject,~) setCurrentFrame( hObject, str2num(hObject.String)));
     handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
     

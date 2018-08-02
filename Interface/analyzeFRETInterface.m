@@ -1,4 +1,4 @@
-function varargout = tracesInterface(varargin)
+function varargout = analyzeFRETInterface(varargin)
     if nargin && ischar(varargin{1})
         if nargout
             [varargout{1:nargout}] = feval(str2func(varargin{1}), varargin{2:end});
@@ -49,7 +49,7 @@ function handles = createInterface(handles)
     handles.tra.cutSlider.JavaPeer.set('Minimum', 1);
     handles.tra.cutSlider.JavaPeer.set('LowValue', 1);
     handles.tra.cutSlider.JavaPeer.set('HighValue', 2);
-    handles.tra.cutSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setCut(handles.tra.cutSlider));
+    handles.tra.cutSlider.JavaPeer.set('StateChangedCallback', @(~,~) setCut(handles.tra.cutSlider));
     handles.tra.highCutTextBox = uicontrol( 'Parent', handles.tra.cutBox,...
                                             'String', '2',...
                                             'Style', 'edit',...
@@ -70,7 +70,7 @@ function handles = createInterface(handles)
     handles.tra.meanSlider.JavaPeer.set('Maximum', 20);
     handles.tra.meanSlider.JavaPeer.set('Minimum', 1);
     handles.tra.meanSlider.JavaPeer.set('Value', 1);
-    handles.tra.meanSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setMean_Slider(handles.tra.meanSlider));
+    handles.tra.meanSlider.JavaPeer.set('StateChangedCallback', @(~,~) setMean_Slider(handles.tra.meanSlider));
     handles.tra.meanBox.set('Widths',[30, -1]);
     
     % remove background
@@ -130,7 +130,7 @@ function handles = createInterface(handles)
     handles.tra.hmmStatesSlider.JavaPeer.set('Minimum', 1);
     handles.tra.hmmStatesSlider.JavaPeer.set('LowValue', 1);
     handles.tra.hmmStatesSlider.JavaPeer.set('HighValue', 2);
-    handles.tra.hmmStatesSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setHMMStates_Slider(handles.tra.hmmStatesSlider));
+    handles.tra.hmmStatesSlider.JavaPeer.set('StateChangedCallback', @(~,~) setHMMStates_Slider(handles.tra.hmmStatesSlider));
     handles.tra.hmmStatesHighTextBox = uicontrol(   'Parent', handles.tra.hmmStatesBox,...
                                                     'String', '2',...
                                                     'Style', 'edit',...
@@ -196,7 +196,7 @@ function handles = createInterface(handles)
     handles.tra.vidCurrentFrame.JavaPeer.set('Maximum', 2);
     handles.tra.vidCurrentFrame.JavaPeer.set('Minimum', 1);
     handles.tra.vidCurrentFrame.JavaPeer.set('Value', 1);
-    handles.tra.vidCurrentFrame.JavaPeer.set('MouseReleasedCallback',...
+    handles.tra.vidCurrentFrame.JavaPeer.set('StateChangedCallback',...
         @(~,~) setVidCurrentFrame(handles.tra.vidCurrentFrame, get(handles.tra.vidCurrentFrame.JavaPeer,'Value')));
     % scroll-able axes
     handles.tra.vidAxesPanel = uipanel('Parent', handles.tra.vidVBox,...
@@ -222,7 +222,7 @@ function handles = createInterface(handles)
     handles.tra.DAScale.JavaPeer.set('Maximum', 10e6);
     handles.tra.DAScale.JavaPeer.set('Minimum', 0);
     handles.tra.DAScale.JavaPeer.set('Value', 0);
-    handles.tra.DAScale.JavaPeer.set('MouseReleasedCallback', @(~,~) setScale(handles.tra.DAScale, handles.tra.DAScale.JavaPeer.get('Value')/handles.tra.DAScale.JavaPeer.get('Maximum')*10));
+    handles.tra.DAScale.JavaPeer.set('StateChangedCallback', @(~,~) setScale(handles.tra.DAScale, handles.tra.DAScale.JavaPeer.get('Value')/handles.tra.DAScale.JavaPeer.get('Maximum')*10));
     handles.tra.DAScale.JavaPeer.set('Orientation',handles.tra.DAScale.JavaPeer.VERTICAL);
     
     uix.Empty('Parent', handles.tra.graphGrid);
@@ -321,7 +321,7 @@ function onDisplay(hObject,handles,loadingSession)
     
     % updates
     if ~exist('loadingSession','var') || ~loadingSession
-        getRawTraceData(hObject, handles);
+        generateFRETTraces(hObject, handles);
     end
     updateMaxTraces(hObject, handles);
     setTrace(hObject,handles,1);
@@ -331,7 +331,7 @@ function onDisplay(hObject,handles,loadingSession)
     axis(handles.tra.DAAxes, [1, vidMax, -scale*0.1, scale*1.1]);
     
     % key presses, these get turned off by onRelease
-    set(handles.f,'KeyPressFcn',@keyPressCallback);
+    set(handles.f,'WindowKeyPressFcn',@keyPressCallback);
     
     handles.rightPanel.Selection = 3;
     handles.rightPanel.Visible = 'on';
@@ -345,7 +345,7 @@ function onRelease(hObject,handles)
     end
     
     % key presses, these get turned on by onDisplay
-    set(handles.f,'KeyPressFcn','');
+    set(handles.f,'WindowKeyPressFcn','');
     
     homeInterface('openSelectFRET',hObject);
 end

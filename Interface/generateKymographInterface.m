@@ -1,4 +1,4 @@
-function varargout = selectDNAInterface(varargin)
+function varargout = generateKymographInterface(varargin)
     if nargin && ischar(varargin{1})
         if nargout
             [varargout{1:nargout}] = feval(str2func(varargin{1}), varargin{2:end});
@@ -15,6 +15,7 @@ function handles = createInterface(handles)
     setappdata(handles.f,'dna_currentFrame', 1);
     setappdata(handles.f,'dna_dnaImlines', cell(0));
     setappdata(handles.f,'dna_manualMode', false);
+    setappdata(handles.f,'data_dna_plt',[]);
 
     handles.dna = struct();
     handles.dna.leftPanel = uix.VBox( 'Parent', handles.leftPanel);
@@ -43,10 +44,10 @@ function handles = createInterface(handles)
     handles.dna.sourcePopUpMenuBox.set('Width', [60, -1]);
     % import textbox
     handles.dna.importVideoTextbox = uicontrol( 'Parent', handles.dna.sourceBox,...
-                                                    'style', 'edit',...
-                                                    'String', 'No video selected',...
-                                                    'Visible','off',...
-                                                    'Callback', @(hObject,~) importVideoTextBoxCallback(hObject,hObject.String));
+                                                'style', 'edit',...
+                                                'String', 'No video selected',...
+                                                'Visible','off',...
+                                                'Callback', @(hObject,~) importVideoTextBoxCallback(hObject,hObject.String));
     % pre-processbox
     handles.dna.preProcBox = uix.VBox('Parent', handles.dna.sourceBox,...
                                       'Visible','off');
@@ -77,7 +78,7 @@ function handles = createInterface(handles)
     handles.dna.brightness.JavaPeer.set('Minimum', 0);
     handles.dna.brightness.JavaPeer.set('LowValue', 0);
     handles.dna.brightness.JavaPeer.set('HighValue', 1e6);
-    handles.dna.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.dna.brightness));
+    handles.dna.brightness.JavaPeer.set('StateChangedCallback', @(~,~) setBrightness(handles.dna.brightness));
     
     % auto brightness and invert box
     handles.dna.autoAndInvertHBox = uix.HBox('Parent', handles.dna.preProcBox);
@@ -101,22 +102,40 @@ function handles = createInterface(handles)
                                            'Title','Auto DNA Detection',...
                                            'Padding',5,...
                                            'Visible','off');
-    handles.dna.autoDNABox = uix.VBox('Parent', handles.dna.autoDNAPanel);
+                                       
+    handles.dna.autoDNAVBox = uix.VBox('Parent', handles.dna.autoDNAPanel);
+    
+    handles.dna.autoDNAAlgorthimDropdown = uicontrol(   'Parent', handles.dna.autoDNAVBox,...
+                                                        'style', 'popupmenu',...
+                                                        'String', {'Staining/Timelaps','Particle Tracking'},...
+                                                        'Callback', @(hObject,~) changeDNADetectionAlgorthim(hObject,guidata(hObject)));
+                                       
+    handles.dna.autoDNACardPanel = uix.CardPanel('Parent', handles.dna.autoDNAVBox);
+    
+    handles.dna.autoDNAOverlapButton = uicontrol(  'Parent', handles.dna.autoDNAVBox,...
+                                                   'String', 'Remove Overlaped DNA',...
+                                                   'Callback', @(hObject,~) removeOverlapedDNA(hObject, guidata(hObject)));
+    
+    handles.dna.autoDNAStainBox = uix.VBox('Parent', handles.dna.autoDNACardPanel);
+    handles.dna.autoDNATrackingBox = uix.VBox('Parent', handles.dna.autoDNACardPanel);
+        
+    handles.dna.autoDNACardPanel.Selection = 1;
+    handles.dna.autoDNAVBox.set('Heights',[25, 260, 25]);
     
     %% DNA Width
     % text
-    uicontrol(  'Parent', handles.dna.autoDNABox,...
+    uicontrol(  'Parent', handles.dna.autoDNAStainBox,...
                 'style', 'text',...
                 'String', 'DNA Width');
     % hbox
-    handles.dna.dnaWidthBox = uix.HBox('Parent', handles.dna.autoDNABox);
+    handles.dna.dnaWidthBox = uix.HBox('Parent', handles.dna.autoDNAStainBox);
     % slider
     [~, handles.dna.dnaWidthSlider] = javacomponent('javax.swing.JSlider');
     handles.dna.dnaWidthSlider.set('Parent', handles.dna.dnaWidthBox);
     handles.dna.dnaWidthSlider.JavaPeer.set('Maximum', 10);
     handles.dna.dnaWidthSlider.JavaPeer.set('Minimum', 1);
     handles.dna.dnaWidthSlider.JavaPeer.set('Value', 2);
-    handles.dna.dnaWidthSlider.JavaPeer.set('MouseReleasedCallback',...
+    handles.dna.dnaWidthSlider.JavaPeer.set('StateChangedCallback',...
                                             @(~,~) setDNAWidth(handles.dna.dnaWidthSlider,...
                                             get(handles.dna.dnaWidthSlider.JavaPeer,'Value')));
     % texbox
@@ -129,18 +148,18 @@ function handles = createInterface(handles)
                                                         
     %% DNA Length
     % text
-    uicontrol(  'Parent', handles.dna.autoDNABox,...
+    uicontrol(  'Parent', handles.dna.autoDNAStainBox,...
                 'style', 'text',...
                 'String', 'DNA Length');
     % hbox
-    handles.dna.dnaLengthBox = uix.HBox('Parent', handles.dna.autoDNABox);
+    handles.dna.dnaLengthBox = uix.HBox('Parent', handles.dna.autoDNAStainBox);
     % slider
     [~, handles.dna.dnaLengthSlider] = javacomponent('javax.swing.JSlider');
     handles.dna.dnaLengthSlider.set('Parent', handles.dna.dnaLengthBox);
     handles.dna.dnaLengthSlider.JavaPeer.set('Maximum', 100);
     handles.dna.dnaLengthSlider.JavaPeer.set('Minimum', 1);
     handles.dna.dnaLengthSlider.JavaPeer.set('Value', 10);
-    handles.dna.dnaLengthSlider.JavaPeer.set('MouseReleasedCallback',...
+    handles.dna.dnaLengthSlider.JavaPeer.set('StateChangedCallback',...
                                             @(~,~) setDNALength(handles.dna.dnaLengthSlider,...
                                             get(handles.dna.dnaLengthSlider.JavaPeer,'Value')));
     % texbox
@@ -153,18 +172,18 @@ function handles = createInterface(handles)
     
     %% DNA Matching Strength
     % text
-    uicontrol(  'Parent', handles.dna.autoDNABox,...
+    uicontrol(  'Parent', handles.dna.autoDNAStainBox,...
                 'style', 'text',...
                 'String', 'DNA Matching Strength');
     % hbox
-    handles.dna.dnaMatchingStrengthBox = uix.HBox('Parent', handles.dna.autoDNABox);
+    handles.dna.dnaMatchingStrengthBox = uix.HBox('Parent', handles.dna.autoDNAStainBox);
     % slider
     [~, handles.dna.dnaMatchingStrengthSlider] = javacomponent('javax.swing.JSlider');
     handles.dna.dnaMatchingStrengthSlider.set('Parent', handles.dna.dnaMatchingStrengthBox);
     handles.dna.dnaMatchingStrengthSlider.JavaPeer.set('Maximum', 100);
     handles.dna.dnaMatchingStrengthSlider.JavaPeer.set('Minimum', 1);
     handles.dna.dnaMatchingStrengthSlider.JavaPeer.set('Value', 10);
-    handles.dna.dnaMatchingStrengthSlider.JavaPeer.set('MouseReleasedCallback',...
+    handles.dna.dnaMatchingStrengthSlider.JavaPeer.set('StateChangedCallback',...
                                             @(~,~) setDNAMatchingStrength(handles.dna.dnaMatchingStrengthSlider,...
                                             get(handles.dna.dnaMatchingStrengthSlider.JavaPeer,'Value')));
     % textbox
@@ -176,13 +195,13 @@ function handles = createInterface(handles)
     handles.dna.dnaMatchingStrengthBox.set('Widths',[-1 50]);
 
     %% Auto button
-    uix.Empty('Parent', handles.dna.autoDNABox);
-    handles.dna.autoDnaDetectionButton = uicontrol(  'Parent', handles.dna.autoDNABox,...
+    uix.Empty('Parent', handles.dna.autoDNAStainBox);
+    handles.dna.autoDnaDetectionButton = uicontrol(  'Parent', handles.dna.autoDNAStainBox,...
                                                      'String', 'Auto Detect DNA',...
                                                      'Callback', @(hObject,~) autoDetectDNA(hObject, guidata(hObject)));
                                                  
     %% DNA kernal preview
-    handles.dna.dnaKernalBox    = uix.HButtonBox('Parent', handles.dna.autoDNABox, 'ButtonSize',[250 100]);    
+    handles.dna.dnaKernalBox    = uix.HButtonBox('Parent', handles.dna.autoDNAStainBox, 'ButtonSize',[250 100]);    
     handles.dna.dnaKernalPanel  = uipanel('Parent', handles.dna.dnaKernalBox,...
                                           'BorderType', 'none');
     handles.dna.dnaKernalAxes   = axes(handles.dna.dnaKernalPanel);
@@ -195,7 +214,60 @@ function handles = createInterface(handles)
     handles.dna.dnaKernalAxesScrollPanel.BackgroundColor = [0 0 0];
                                                  
     % Heights             
-    handles.dna.autoDNABox.set('Heights',[15 20 15 20 15 20 10 25 120]);
+    handles.dna.autoDNAStainBox.set('Heights',[15 20 15 20 15 20 10 25 120]);
+    
+    %% Auto Tracking
+    
+    % filter
+    uicontrol( 'Parent', handles.dna.autoDNATrackingBox,...
+               'Style' , 'text', ...
+               'String', 'Gaussina Filter Size');
+    [~, handles.dna.particleFilter] = javacomponent('javax.swing.JSlider');
+    handles.dna.particleFilter.set('Parent', handles.dna.autoDNATrackingBox);
+    handles.dna.particleFilter.JavaPeer.set('Maximum', 5e5);
+    handles.dna.particleFilter.JavaPeer.set('Minimum', 0);
+    handles.dna.particleFilter.JavaPeer.set('Value', 0);
+    handles.dna.particleFilter.JavaPeer.set('MouseReleasedCallback', @(~,~) updateDisplay(handles.dna.particleFilter));
+    % add filter lables
+    parFilLabels = java.util.Hashtable();
+    parFilLabels.put( int32( 0 ),   javax.swing.JLabel('0') );
+    parFilLabels.put( int32( 1e5 ), javax.swing.JLabel('1') );
+    parFilLabels.put( int32( 2e5 ), javax.swing.JLabel('2') );
+    parFilLabels.put( int32( 3e5 ), javax.swing.JLabel('3') );
+    parFilLabels.put( int32( 4e5 ), javax.swing.JLabel('4') );
+    parFilLabels.put( int32( 5e5 ), javax.swing.JLabel('5') );
+    handles.dna.particleFilter.JavaPeer.setLabelTable( parFilLabels );
+    handles.dna.particleFilter.JavaPeer.setPaintLabels(true);
+    
+    % intensity
+    uicontrol( 'Parent', handles.dna.autoDNATrackingBox,...
+               'Style' , 'text', ...
+               'String', 'Selected Intensities');
+    [~, handles.dna.particleIntensity] = javacomponent('com.jidesoft.swing.RangeSlider');
+    handles.dna.particleIntensity.set('Parent', handles.dna.autoDNATrackingBox);
+    handles.dna.particleIntensity.JavaPeer.set('Maximum', 1e6);
+    handles.dna.particleIntensity.JavaPeer.set('Minimum', 0);
+    handles.dna.particleIntensity.JavaPeer.set('LowValue', 9e5);
+    handles.dna.particleIntensity.JavaPeer.set('HighValue', 1e6);
+    handles.dna.particleIntensity.JavaPeer.set('MouseReleasedCallback', @(~,~) updateDisplay(handles.dna.particleIntensity));
+            
+    % max tracking distance
+    handles.dna.trackingDistanceBox = uix.HBox( 'Parent', handles.dna.autoDNATrackingBox);
+    uicontrol(  'Parent', handles.dna.trackingDistanceBox,...
+                'String', 'Maximum Track Distance',...
+                'Style', 'text');
+    handles.dna.trackingDistance = uicontrol(  'Parent', handles.dna.trackingDistanceBox,...
+                                                'String', '2',...
+                                                'Style', 'edit');
+    
+    % button
+    uix.Empty('Parent', handles.dna.autoDNATrackingBox);
+    handles.dna.autoDnaDetectionTrackingButton = uicontrol(  'Parent', handles.dna.autoDNATrackingBox,...
+                                                     'String', 'Auto Detect DNA',...
+                                                     'Callback', @(hObject,~) autoDetectDNA(hObject, guidata(hObject)));
+                                                 
+    % Heights             
+    handles.dna.autoDNATrackingBox.set('Heights',[15 35 15 20 25 25 25]);
                                                  
     %% Manual DNA Detection
     handles.dna.manualDNAPanel = uix.BoxPanel(  'Parent', handles.dna.leftPanel,...
@@ -223,20 +295,20 @@ function handles = createInterface(handles)
     handles.dna.manualDNAButtonBox.set('Widths',[-1 -2]);
                                                 
     %% Kymographs
-    handles.dna.kymPanel = uix.BoxPanel(  'Parent', handles.dna.leftPanel,...
-                                          'Title','Kymographs',...
-                                          'Padding',5,...
-                                          'Visible','off');
-    handles.dna.kymBox = uix.VButtonBox('Parent', handles.dna.kymPanel,...
-                                                'ButtonSize',[120 30],...
-                                                'Spacing',2);
+    handles.dna.kymPanel = uix.BoxPanel(    'Parent', handles.dna.leftPanel,...
+                                            'Title','Kymographs',...
+                                            'Padding',5,...
+                                            'Visible','off');
+    handles.dna.kymBox = uix.VButtonBox(    'Parent', handles.dna.kymPanel,...
+                                            'ButtonSize',[120 30],...
+                                            'Spacing',2);
     % kym button
-    handles.dna.kymButton = uicontrol( 'Parent', handles.dna.kymBox,...
-                                                'String', 'Generate Kymographs',...
-                                                'Callback', @(hObject,~) openKymographs(hObject, guidata(hObject)));
+    handles.dna.kymButton = uicontrol(  'Parent', handles.dna.kymBox,...
+                                      	'String', 'Generate Kymographs',...
+                                       	'Callback', @(hObject,~) openKymographs(hObject, guidata(hObject)));
                                                  
     %% 
-    handles.dna.leftPanel.set('Heights',[25 200 285 80 60]);
+    handles.dna.leftPanel.set('Heights',[25 200 340 80 60]);
 end
 
 %% Load from session
@@ -314,7 +386,7 @@ function selectSource(hObject,handles)
         case 3 % Import
             handles.dna.importVideoTextbox.Visible = 'on';
             
-            [fileName, fileDir, ~] = uigetfile({'*.tif';'*.tiff';'*.TIF';'*.TIFF'}, 'Select the video file'); % prompt user for file
+            [fileName, fileDir, ~] = uigetfile([getappdata(handles.f,'savePath') '*.tif;*.tiff;*.TIF;*.TIFF'], 'Select the video file'); % prompt user for file
             if fileName ~= 0 % if user does not presses cancel
                 importVideoTextBoxCallback(hObject, [fileDir fileName]);
             else
@@ -401,7 +473,7 @@ function onDisplay(hObject,handles)
     set(handles.axesControl.currentFrame.JavaPeer,'Maximum',size(stack,3));
     set(handles.axesControl.currentFrame.JavaPeer,'Value', getappdata(handles.f,'dna_currentFrame'));
     set(handles.axesControl.currentFrameTextbox,'String', num2str(getappdata(handles.f,'dna_currentFrame')));
-    handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
+    handles.axesControl.currentFrame.JavaPeer.set('StateChangedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
     handles.axesControl.currentFrameTextbox.set('Callback', @(hObject,~) setCurrentFrame( hObject, str2num(hObject.String)));
     handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
     
@@ -409,7 +481,10 @@ function onDisplay(hObject,handles)
     handles.axesControl.seperateButtonGroup.Visible =  'off';
     handles.axesPanel.Selection = 1; % overlap channels mode for one axes
     
-    %
+    % tracking settings
+    handles.dna.particleIntensity.JavaPeer.set('Maximum',getappdata(handles.f,'video_maxIntensity'));
+    
+    % staining settings
     oneAxesCallbackID = handles.oneAxes.AxesAPI.addNewMagnificationCallback(@(~) updateDNAKernal(handles.dna.dnaKernalAxes, guidata(handles.dna.dnaKernalAxes)));
     setappdata(handles.f,'oneAxesCallbackID',oneAxesCallbackID);
     updateDNAKernal(hObject, handles);
@@ -432,6 +507,14 @@ function onRelease(hObject,handles)
     % current frame
     setappdata(handles.f,'dna_currentFrame', get(handles.axesControl.currentFrame.JavaPeer,'Value'));
     
+    % tracking settings
+    plt = getappdata(handles.f,'data_dna_plt');
+    if ~isempty(plt)
+        delete(plt);
+    end
+    setappdata(handles.f,'data_dna_plt',plt);
+    
+    % staining setting
     oneAxesCallbackID = getappdata(handles.f,'oneAxesCallbackID');
     handles.oneAxes.AxesAPI.removeNewMagnificationCallback(oneAxesCallbackID);
     
@@ -444,6 +527,48 @@ function updateDisplay(hObject,handles)
     end
     
     I = getCurrentImage(hObject,handles);
+    
+    % remove old particles
+    plt = getappdata(handles.f,'data_dna_plt');
+    if ~isempty(plt)
+        delete(plt);
+    end
+    
+    % apply the gaussian filter and show selected particles if the user is using the tracking algrothim
+    if handles.dna.autoDNAAlgorthimDropdown.Value==2
+        % get tracking settings
+        filterSize = handles.dna.particleFilter.JavaPeer.get('Value') / ...
+                        handles.dna.particleFilter.JavaPeer.get('Maximum') * 5;
+        particleMinInt = handles.dna.particleIntensity.JavaPeer.get('LowValue');
+        particleMaxInt = handles.dna.particleIntensity.JavaPeer.get('HighValue');
+        combinedROIMask = getappdata(handles.f,'combinedROIMask');
+        
+        % apply gaussian filter
+        if filterSize > 0.1
+            I = imgaussfilt(I, filterSize);
+        end
+        
+        % detect particles
+        particles = findParticles(I, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
+        centers = particles{1};
+
+        %% display particles
+        hWaitBar = waitbar(0,'Loading ...');
+        hold(handles.oneAxes.Axes,'on');
+        
+        % if too many particles were found only show some
+        if size(centers,1) > 5000 
+            pauseVideo(hObject,handles);
+            msgbox('Too many particles found!');
+            plt = [];
+        else
+            plt = plot( handles.oneAxes.Axes, centers(:,1), centers(:,2), '+r');
+        end
+
+        hold(handles.oneAxes.Axes,'off');
+        setappdata(handles.f,'data_dna_plt',plt);
+        delete(hWaitBar);
+    end
     
     % display
     handles.oneAxes.AxesAPI.replaceImage(I,'PreserveView',true);
@@ -572,16 +697,33 @@ function saveImlinesToKyms(hObject,handles)
     kyms = getappdata(handles.f,'kyms');
     dnaImlines = getappdata(handles.f,'dna_dnaImlines');
     removeInd = (1:size(kyms,1))';
+    
+    warning('off','MATLAB:table:RowsAddedExistingVars');
+    
     for i=1:size(dnaImlines,2)
         row = get(dnaImlines{i},'UserData');
-        kyms.Position(row,1:4) = reshape(getPosition(dnaImlines{i})',1,[]);
+        pos = reshape(getPosition(dnaImlines{i})',1,[]);
+        % if position has changed
+        if size(kyms,1)<row || any(kyms.Position(row,1:4) ~= pos)
+            kyms.ImageGenerated(row) = false;
+            kyms.Brightness(row) = {-1};
+            kyms.Position(row,1:4) = pos;
+        end
+        
         removeInd(removeInd==row) = [];
     end
+    
+    warning('on','MATLAB:table:RowsAddedExistingVars');
     
     % remove all kyms that with no corresponding Imline
     kyms(removeInd,:) = [];
     
     setappdata(handles.f,'kyms',kyms);
+end
+
+function changeDNADetectionAlgorthim(hObject,handles)
+    handles.dna.autoDNACardPanel.Selection = handles.dna.autoDNAAlgorthimDropdown.Value;
+    updateDisplay(hObject,handles); 
 end
 
 %% Play/pause
@@ -594,8 +736,9 @@ function playVideo(hObject,handles)
     setappdata(handles.f,'Playing_Video',1);
     currentFrame = handles.axesControl.currentFrame.JavaPeer.get('Value');
     while getappdata(handles.f,'Playing_Video')
-        if currentFrame < handles.axesControl.currentFrame.JavaPeer.get('Maximum')
-            currentFrame = currentFrame+1;
+        playSpeed = getappdata(handles.f,'playSpeed');
+        if currentFrame+playSpeed <= handles.axesControl.currentFrame.JavaPeer.get('Maximum')
+            currentFrame = currentFrame+playSpeed;
         else
             currentFrame = 1;
         end
@@ -679,60 +822,27 @@ end
 %% Auto Dectect DNA
 function autoDetectDNA(hObject, handles)
     %% Confirm current DNAs can first be removed
-    removeAns = questdlg(   'Are you sure? This will clear all DNAs.',...
-                            'Are you sure? This will clear all DNAs.',...
-                            'Yes, clear all','No','No');
-    if strcmp(removeAns, 'No')
-        return; % stop
-    else
-        removeAllDNA(hObject,handles); % remove the old DNAs
+    
+%         % are there any imlines to remove?
+%     dnaImlines = getappdata(handles.f,'dna_dnaImlines');
+%     if size(dnaImlines,2)~=0
+%         removeAns = questdlg(   'Are you sure? This will clear all DNAs.',...
+%                                 'Are you sure? This will clear all DNAs.',...
+%                                 'Yes, clear all','No','No');
+%         if strcmp(removeAns, 'No')
+%             return; % stop
+%         else
+%             removeAllDNA(hObject,handles); % remove the old DNAs
+%         end
+%     end    
+    
+    switch handles.dna.autoDNAAlgorthimDropdown.Value
+        case 1 % Stain
+            detectDNAStains(hObject, handles);
+        case 2 % Tracking
+            detectDNAByTracking(hObject, handles);
     end
     
-    %% Setup
-    hWaitBar = waitbar(0,'Finding DNA...', 'WindowStyle', 'modal');
-    
-    updateDNAKernal(hObject, handles);
-    dnaKernal = getappdata(handles.f,'dnaKernal');
-    I = getCurrentImage(hObject, handles);
-    dnaMatchingStrength = get(handles.dna.dnaMatchingStrengthSlider.JavaPeer,'Value');
-    
-    %% Prepare image
-    I = adapthisteq(I,'Distribution','rayleigh','ClipLimit',0.005);
-
-    c = normxcorr2(dnaKernal,I);
-    c = normalize(c,'range'); % normalize between 0 and 1
-
-    c = imhmax(c,mean(c(:)));
-    regMax = imregionalmax(c);
-
-    CC = bwconncomp(regMax);
-    S = regionprops(CC,'Centroid');
-    
-    numTotalFound = size(S,1);
-    
-    corrs = zeros(size(S,1),1);
-    rects = zeros(size(S,1),4);
-
-    for i=1:numTotalFound
-        center = S(i,:).Centroid;
-        rects(i,:) = [center(1)-size(dnaKernal,2), center(2)-size(dnaKernal,1), size(dnaKernal,2), size(dnaKernal,1)];
-
-        dnaImage = imcrop(I,rects(i,:));
-
-        corrs(i) = max(max(xcorr2(dnaImage,dnaKernal)));
-    end
-
-    for i=1:numTotalFound
-        if corrs(i) > dnaMatchingStrength * sum(sum(dnaKernal))*2^16 / 100
-            % create new dan at pos found
-            addNewDNA(hObject, handles, [rects(i,1:2)+[0 rects(i,4)/2]; rects(i,1:2)+[rects(i,3) rects(i,4)/2]]);
-        end
-
-        % update loading bar
-        waitbar(i/numTotalFound);
-    end
-    
-    delete(hWaitBar);
 end
 
 function setDNAWidth(hObject, value)
@@ -787,6 +897,38 @@ function updateDNAKernal(hObject, handles)
     setappdata(handles.f,'dnaKernal',dnaKernal);
 end
 
+function removeOverlapedDNA(hObject, handles)
+    hWaitBar = waitbar(0,'Checking for overlaping DNA...', 'WindowStyle', 'modal');
+
+    dnaImlines = getappdata(handles.f,'dna_dnaImlines');
+    
+    overlapRadius = 5;
+
+    prevX = zeros(size(dnaImlines,2),1);
+    prevY = zeros(size(dnaImlines,2),1);
+    i = 1;
+    while i <= size(dnaImlines,2)
+        waitbar(i/size(dnaImlines,2));
+        
+        pos = getPosition(dnaImlines{i});
+        x1 = pos(1,1);
+        y1 = pos(1,2);
+        x2 = pos(2,1);
+        y2 = pos(2,2);
+        
+        if any(abs(prevX(1:i-1) - mean([x2,x1])) < overlapRadius & abs(prevY(1:i-1) - mean([y2,y1])) < overlapRadius)
+            deleteDNA(dnaImlines{i}, 0);
+            dnaImlines = getappdata(handles.f,'dna_dnaImlines');
+        else
+            prevX(i) = mean([x1,x2]);
+            prevY(i) = mean([y1,y2]);
+            i = i+1;
+        end
+    end
+    
+    delete(hWaitBar);
+end
+
 %% DNA
 function activateManualMode(hObject, handles)
     % switch on manual controls
@@ -800,7 +942,7 @@ function activateManualMode(hObject, handles)
     
     % create a new DNA everytime one is finished
     while getappdata(handles.f,'dna_manualMode')
-        addNewDNA(hObject, handles);
+            addNewDNA(hObject,handles);
     end
 end
 
@@ -882,17 +1024,27 @@ function resetDNAGraphics(hObject,handles)
     % delete the old ones first
     removeAllDNA(hObject,handles);
     
+    hWaitBar = waitbar(0,'Displaying DNA...', 'WindowStyle', 'modal');
+    
+    handles.oneAxes.AxesScrollPanel.Visible = 'off';
+    
     kyms = getappdata(handles.f,'kyms');
     linePos = kyms.Position;
     
     % add a dna for each row in linePos
     for i = 1:size(linePos,1)
+        waitbar(i/size(linePos,1));
         addNewDNA(hObject, handles, reshape(linePos(i,:),2,[])');
     end
+    
+    handles.oneAxes.AxesScrollPanel.Visible = 'on';
+    delete(hWaitBar);
 end
 
 function removeAllDNA(hObject,handles)
-    hWaitBar = waitbar(0,'Removing DNA...', 'WindowStyle', 'modal');
+    hWaitBar = waitbar(0,'Clearing DNA Display...', 'WindowStyle', 'modal');
+    
+    handles.oneAxes.AxesScrollPanel.Visible = 'off';
 
     dnaImlines = getappdata(handles.f,'dna_dnaImlines');
     % delete each imline graphic object
@@ -901,11 +1053,13 @@ function removeAllDNA(hObject,handles)
         waitbar(i/length(dnaImlines));
     end
     
+    handles.oneAxes.AxesScrollPanel.Visible = 'on';
     setappdata(handles.f,'dna_dnaImlines',cell(0));
     delete(hWaitBar);
 end
 
 function removeAllDNA_Callback(hObject,handles)
+    % ask the user if it is fine to remove the lines
     removeAns = questdlg('Are you sure you want to clear all DNAs?','Are you sure you want to clear all DNAs?','Yes, clear all','No','No');
     if strcmp(removeAns, 'Yes, clear all')
         removeAllDNA(hObject,handles);
@@ -921,16 +1075,24 @@ function openKymographs(hObject,handles,loadSessionFlag)
     if strcmp(handles.vid.selectVideoTextBox.String, 'No video selected')
         msgbox('The video has not been imported. Go to video settings.');
         return;
-    end
+    end    
     
     if ~exist('loadSessionFlag','var')
         % onRelase overwrites the appdata kyms so it must be
         % suppressed when loading from session
+        
+        num_dnaImlines = size(getappdata(handles.f,'dna_dnaImlines'),1);
+        if num_dnaImlines == 0
+            msgbox('No lines to generate kymographs from.');
+            return;
+        end
+        
         saveSession(handles.f, 1); % auto save
         onRelease(hObject,handles); 
     end
     
-    kymographInterface('onDisplay',hObject,handles);
+    analyzeKymographInterface('onDisplay',hObject,handles);
     handles.leftPanel.Selection = 5;
 end
+
 

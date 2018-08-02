@@ -1,4 +1,13 @@
-function handles = createInterface
+function handles = createInterface(varargin)
+    if nargin>=1
+        if nargin && ischar(varargin{1})
+            if nargout
+                [varargout{1:nargout}] = feval(str2func(varargin{1}), varargin{2:end});
+            else
+                feval(str2func(varargin{1}), varargin{2:end});
+            end
+        end
+    end
 
     %% Setup Main Figure
     handles = struct();
@@ -90,6 +99,18 @@ function handles = createInterface
                                                     
     handles.axesControl.playButton = uicontrol( 'Parent', handles.axesControl.playContolsBox, ...
                                                 'String','Play');
+                                            
+    uicontrol(  'Parent', handles.axesControl.playContolsBox, ...
+                'Style','text',...
+                'String','Play Speed:');
+                                            
+    handles.axesControl.playSpeedBox = uix.HButtonBox('Parent', handles.axesControl.playContolsBox,...
+                                                      'ButtonSize',[30,25]);
+            
+    handles.axesControl.playSpeed = uicontrol(  'Parent', handles.axesControl.playSpeedBox, ...
+                                                'Style','edit',...
+                                                'String','1',...
+                                                'Callback', @(hObject,~) setPlaySpeed(hObject,guidata(hObject),str2double(hObject.String)));
                                                         
     handles.axesControl.currentFrameBox = uix.HBox('Parent', handles.axesControl.currentFramePanel);
 
@@ -103,9 +124,9 @@ function handles = createInterface
     handles.axesControl.currentFrame.JavaPeer.set('Minimum', 1);
     handles.axesControl.currentFrame.JavaPeer.set('Value', 1);
     
-    handles.axesControl.currentFrameTextbox = uicontrol(  'Parent', handles.axesControl.currentFrameBox, ...
-                                                            'Style','edit',...
-                                                            'String','1');
+    handles.axesControl.currentFrameTextbox = uicontrol('Parent', handles.axesControl.currentFrameBox, ...
+                                                       	'Style','edit',...
+                                                        'String','1');
     
     handles.axesControl.currentFrameBox.set('Widths',[35 -1 37]);
     
@@ -134,19 +155,30 @@ function handles = createInterface
     %% traces right panel
     handles.tra = struct();
     handles.rightPanelTra   = uix.Panel('Parent', handles.rightPanel, 'BorderType', 'none');
-    
+        
     %% create sub-interfaces
-    handles = homeInterface(        'createInterface',handles);
-    handles = videoSettingInterface('createInterface',handles);
-    handles = mappingInterface(     'createInterface',handles);
-    handles = selectDNAInterface(   'createInterface',handles);
-    handles = kymographInterface(   'createInterface',handles);
-    handles = selectFRETInterface(  'createInterface',handles);
-    handles = tracesInterface(      'createInterface',handles);
-    handles = driftInterface(       'createInterface',handles);
+    handles = homeInterface(                    'createInterface',handles);
+    handles = videoSettingInterface(            'createInterface',handles);
+    handles = mappingInterface(                 'createInterface',handles);
+    handles = generateKymographInterface(       'createInterface',handles);
+    handles = analyzeKymographInterface(        'createInterface',handles);
+    handles = generateFRETInterface(            'createInterface',handles);
+    handles = analyzeFRETInterface(             'createInterface',handles);
+    handles = driftInterface(                   'createInterface',handles);
+    handles = generateFlowStrechingInterface(	'createInterface',handles);
+    handles = analyzeFlowStrechingInterface(	'createInterface',handles);
 
     %% save and display
     handles.rightPanel.Selection = 1;% start with the default right panel
     handles.leftPanel.Selection = 1; % start with the home left panel
     guidata(handles.f,handles);
+end
+
+function setPlaySpeed(hObject, handles, value)
+    value = min(value,100);
+    value = max(value,1);
+    
+    setappdata(handles.f, 'playSpeed', value);
+    handles.kym.playSpeed.String = num2str(value);
+    handles.axesControl.playSpeed.String = num2str(value);
 end

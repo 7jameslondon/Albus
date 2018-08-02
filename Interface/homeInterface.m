@@ -39,18 +39,25 @@ function handles = createInterface(handles)
                                             'String', 'Generate FRET Traces',...
                                             'Callback', @(hObject,~) openSelectFRET(hObject),...
                                             'Enable', 'off');
+                                        
+    handles.home.fretButton = uicontrol(    'Parent', handles.home.VButtonBox,...
+                                            'String', 'Generate Flow Streching Profiles',...
+                                            'Callback', @(hObject,~) openGenerateFlowStreching(hObject),...
+                                            'Enable', 'off');
 end
 
 %% Callbacks
 % handles.leftPanel.Selection = #
-% 1 - home
-% 2 - video
-% 3 - mapping
-% 4 - generate kymographs
-% 5 - analze kymographs
-% 6 - generate fret
-% 7 - analyze fret
-% 8 - drift
+% 1  - home
+% 2  - video
+% 3  - mapping
+% 4  - generate kymographs
+% 5  - analyze kymographs
+% 6  - generate fret
+% 7  - analyze fret
+% 8  - drift
+% 9  - generate flow streching
+% 10 - analyze flow streching
 
 function openVideoSettings(hObject)
     handles = guidata(hObject);
@@ -104,7 +111,7 @@ function openSelectDNA(hObject)
     onRelease(hObject,handles)
     
     handles.leftPanel.Selection = 4;
-    selectDNAInterface('onDisplay',hObject,handles);
+    generateKymographInterface('onDisplay',hObject,handles);
 end
 
 function openSelectFRET(hObject)
@@ -113,7 +120,16 @@ function openSelectFRET(hObject)
     onRelease(hObject,handles)
     
     handles.leftPanel.Selection = 6;
-    selectFRETInterface('onDisplay',hObject,handles);
+    generateFRETInterface('onDisplay',hObject,handles);
+end
+
+function openGenerateFlowStreching(hObject)
+    handles = guidata(hObject);
+    setappdata(handles.f,'mode','Generate Flow Streching');
+    onRelease(hObject,handles)
+    
+    handles.leftPanel.Selection = 9;
+    generateFlowStrechingInterface('onDisplay',hObject,handles);
 end
 
 %% Updates
@@ -194,7 +210,7 @@ function onDisplay(hObject,handles)
         % current frame
         set(handles.axesControl.currentFrame.JavaPeer,'Value', getappdata(handles.f,'home_currentFrame'));
         set(handles.axesControl.currentFrameTextbox,'String', num2str(getappdata(handles.f,'home_currentFrame')));
-        handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
+        handles.axesControl.currentFrame.JavaPeer.set('StateChangedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
         handles.axesControl.currentFrameTextbox.set('Callback', @(hObject,~) setCurrentFrame( hObject, str2num(hObject.String)));
         % play button
         handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
@@ -248,8 +264,9 @@ function playVideo(hObject,handles)
     setappdata(handles.f,'Playing_Video',1);
     currentFrame = handles.axesControl.currentFrame.JavaPeer.get('Value');
     while getappdata(handles.f,'Playing_Video')
-        if currentFrame < handles.axesControl.currentFrame.JavaPeer.get('Maximum')
-            currentFrame = currentFrame+1;
+        playSpeed = getappdata(handles.f, 'playSpeed');
+        if currentFrame+playSpeed <= handles.axesControl.currentFrame.JavaPeer.get('Maximum')
+            currentFrame = currentFrame+playSpeed;
         else
             currentFrame = 1;
         end

@@ -74,7 +74,7 @@ function handles = createInterface(handles)
     handles.map.brightness.JavaPeer.set('HighValue', 1e6);
     handles.map.brightness.JavaPeer.set('PaintTicks',true);
     handles.map.brightness.JavaPeer.set('MajorTickSpacing',1e5);
-    handles.map.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.map.brightness));
+    handles.map.brightness.JavaPeer.set('StateChangedCallback', @(~,~) setBrightness(handles.map.brightness));
     
     % box for auto, invert and time average
     handles.map.autoAndInvertHBox = uix.HBox('Parent', handles.map.preProcVBox);
@@ -179,15 +179,19 @@ function handles = createInterface(handles)
     handles.map.particleIntensity.JavaPeer.set('HighValue', 1e6);
     handles.map.particleIntensity.JavaPeer.set('MouseReleasedCallback', @(~,~) updateParticleDetection(handles.map.particleIntensity));
     
+    handles.map.particlesAutoButton = uicontrol('Parent', handles.map.particleVBox,...
+                                                'String', 'Auto Select Particles',...
+                                                'Callback', @(hObject,~) autoAdjustParticleSelection(hObject,guidata(hObject)));
+    
     handles.map.regChannelsButton = uicontrol(  'Parent', handles.map.particleVBox,...
                                                 'String', 'Register Channels',...
                                                 'Callback', @(hObject,~) registerMapping(hObject,guidata(hObject)));
     uicontrol( 'Parent', handles.map.particleVBox,...
                'Style','text',...
-               'String', [  'Register Channels: This may take a several minutes. This will attempt to overlap the two channels using the some ' ...
-                            'of the particles that were detected. This uses only one frame of the video.']);
+               'String', [  'Register Channels: This may take several minutes. This will attempt to overlap each of the channels using the position' ...
+                            'of the particles that were detected. This uses the current frame of the video.']);
     
-    handles.map.particleVBox.set('Heights',[25 15 50 15 50 25 75]);
+    handles.map.particleVBox.set('Heights',[25 15 50 15 50 25 25 75]);
     
     %% Save
     handles.map.saveMappingPanel = uix.Panel('Parent', handles.map.leftPanel,...
@@ -197,14 +201,15 @@ function handles = createInterface(handles)
                                               'String', 'Done',...
                                            	  'Callback', @(hObject,~) onRelease(hObject, guidata(hObject)));
     %%
-    handles.map.leftPanel.set('Heights',[25, 125, 100, 80, 50, 250 35]);
+    handles.map.leftPanel.set('Heights',[25, 125, 100, 80, 50, 280 35]);
     
     setappdata(handles.f,'mapping_currentFrame',1)
 end
 
 %% Select File Callback
 function selectVideoFileButtonCallback(hObject)
-    [fileName, fileDir, ~] = uigetfile({'*.tif';'*.tiff';'*.TIF';'*.TIFF'}, 'Select the mapping video file'); % prompt user for file
+    handles = guidata(hObject);
+    [fileName, fileDir, ~] = uigetfile([getappdata(handles.f,'savePath') '*.tif;*.tiff;*.TIF;*.TIFF'], 'Select the mapping video file'); % prompt user for file
     if fileName ~= 0 % if user does not presses cancel
         selectVideoFileTextBoxCallback(hObject, [fileDir fileName]);
     end
@@ -256,9 +261,8 @@ end
 
 function handles = loadFromSession(hObject,handles,session)
     if strcmp(session.map_mode, 'Loaded Map')
-        handles = setupMultiAxes(hObject,handles,size(session.ROI,1));
-        guidata(hObject,handles);
-        switchMode(hObject, guidata(hObject), session.map_mode);
+        handles = setupMultiAxes(hObject, handles, size(session.ROI,1));
+        switchMode(hObject, handles, session.map_mode);
         return;
     end
 
@@ -272,7 +276,7 @@ function handles = loadFromSession(hObject,handles,session)
     if stack==0 % the file could not be located
         uiwait(msgbox('The original mapping video file could not be found. Please locate the new location of the mapping video and select it.'));
         
-        [fileName, fileDir, ~] = uigetfile({'*.tif';'*.tiff';'*.TIF';'*.TIFF'}, 'Select the mapping video file'); % prompt user for file
+        [fileName, fileDir, ~] = uigetfile([getappdata(handles.f,'savePath') '*.tif;*.tiff;*.TIF;*.TIFF'], 'Select the mapping video file'); % prompt user for file
         if fileName ~= 0 % if user does not presses cancel
             handles = setVideoFile(hObject, handles, [fileDir fileName]);
         else
@@ -307,6 +311,7 @@ function handles = loadFromSession(hObject,handles,session)
     % ROI
     handles.map.numberROITextBox.Value = session.map_numberROI;
     roiSelected(hObject, handles);
+    handles = guidata(hObject);
     
     % particle settings
     handles.map.particleChannel.Value = session.map_particleChannel;
@@ -318,6 +323,8 @@ function handles = loadFromSession(hObject,handles,session)
     else
         switchMode(hObject, guidata(hObject), session.map_mode);
     end
+    
+    guidata(hObject,handles);
 end
     
 function handles = setVideoFile(hObject, handles, filePath)
@@ -336,7 +343,8 @@ function handles = setVideoFile(hObject, handles, filePath)
 end
 
 function loadPreviousMapping(hObject)
-    [fileName, fileDir, ~] = uigetfile({'*.mat'}, 'Select a mapped session file'); % prompt user for file
+    handles = guidata(hObject);
+    [fileName, fileDir, ~] = uigetfile([getappdata(handles.f,'savePath') '*.mat'], 'Select a mapped session file'); % prompt user for file
     if fileName == 0 % the user canceled
         return;
     end
@@ -454,21 +462,7 @@ function roiSelected(hObject, handles)
     setappdata(handles.f,'selectingROI', false);
     
     numROI = handles.map.numberROITextBox.Value+1;
-    maxIntensity = getappdata(handles.f,'mapping_maxIntensity');
-    particleSettings = getappdata(handles.f,'mapping_particleSettings');
     
-    %% Setup particle detection settings
-    channelStr = cell(numROI+1,1);
-    channelStr = {'All Channels'};
-    for i=1:numROI
-        channelStr{i+1} = ['Channel ' num2str(i)];
-        particleSettings(i).filterSize = 0;
-        particleSettings(i).minIntensity = maxIntensity*0.9;
-        particleSettings(i).maxIntensity = maxIntensity;
-    end
-    setappdata(handles.f,'mapping_particleSettings',particleSettings);
-    handles.map.particleChannel.String = channelStr;
-
     %% Setup seperate chanels axes
     handles = setupMultiAxes(hObject,handles,numROI);
 
@@ -476,6 +470,7 @@ function roiSelected(hObject, handles)
     ROI = getappdata(handles.f,'ROI');
     stack = getappdata(handles.f,'data_mapping_originalStack');
     seperatedStacks = seperateStack(ROI,stack);
+    setappdata(handles.f,'data_mapping_originalSeperatedStacks',seperatedStacks);
     
     %% Remove imrects
     if isfield(handles,'roiRect')
@@ -486,18 +481,24 @@ function roiSelected(hObject, handles)
         handles = rmfield(handles,'roiRect');
     end
     
-    %% Save then Display
-    setappdata(handles.f,'data_mapping_originalSeperatedStacks',seperatedStacks);
+    %% Setup particle detection settings
+    channelStr = cell(numROI+1,1);
+    channelStr = {'All Channels'};
+    for i=1:numROI
+        channelStr{i+1} = ['Channel ' num2str(i)];
+    end
+    handles.map.particleChannel.String = channelStr;
+    
     guidata(hObject,handles);
-    particleDetectionChangeChannel(hObject,handles);
+    autoAdjustParticleSelection(hObject, handles);
     switchMode(hObject, handles, 'Particles');
-    updateParticleDetection(hObject);
+    
     handles.multiAxes.AxesAPI{1}.setMagnification(handles.multiAxes.AxesAPI{1}.findFitMag()); % zoom axes
     close(hWaitBar);
 end
 
 function handles = setupMultiAxes(hObject,handles,numROI)
-% delete old multiAxes if they exist
+    % delete old multiAxes if they exist
     if isfield(handles,'multiAxes')
         delete(handles.multiAxes.Grid);
     end
@@ -813,52 +814,6 @@ function updateDisplay(hObject,handles,particleFlag)
     updateSelectROI(hObject, handles);
 end
 
-function updateParticleDetection(hObject)
-    hWaitBar = waitbar(0,'loading ...', 'WindowStyle', 'modal');
-    
-    handles = guidata(hObject);
-    particleSettings = getappdata(handles.f,'mapping_particleSettings');
-    numChannels = size(particleSettings,2);
-        
-    if handles.map.particleChannel.Value == 1
-        for c=1:numChannels
-            particleSettings(c).filterSize = handles.map.particleFilter.JavaPeer.get('Value') / handles.map.particleFilter.JavaPeer.get('Maximum') * 5;
-            particleSettings(c).minIntensity = handles.map.particleIntensity.JavaPeer.get('LowValue');
-            particleSettings(c).maxIntensity = handles.map.particleIntensity.JavaPeer.get('HighValue');
-        end
-    else
-        channel = handles.map.particleChannel.Value-1;
-        particleSettings(channel).filterSize = handles.map.particleFilter.JavaPeer.get('Value') / handles.map.particleFilter.JavaPeer.get('Maximum') * 5;
-        particleSettings(channel).minIntensity = handles.map.particleIntensity.JavaPeer.get('LowValue');
-        particleSettings(channel).maxIntensity = handles.map.particleIntensity.JavaPeer.get('HighValue');
-    end
-    setappdata(handles.f,'mapping_particleSettings',particleSettings); % save
-    
-    updateDisplay(hObject,handles,1); % parameter '1' added to add particles
-    
-    delete(hWaitBar);
-end
-
-function particleDetectionChangeChannel(hObject,handles)
-    particleSettings = getappdata(handles.f,'mapping_particleSettings');
-    numChannels = size(particleSettings,2);
-    
-    if handles.map.particleChannel.Value == 1
-        for c=1:numChannels
-            handles.map.particleFilter.JavaPeer.set('Value', round(particleSettings(c).filterSize * handles.map.particleFilter.JavaPeer.get('Maximum') / 5));
-            handles.map.particleIntensity.JavaPeer.set('LowValue', particleSettings(c).minIntensity);
-            handles.map.particleIntensity.JavaPeer.set('HighValue', particleSettings(c).maxIntensity);
-        end
-    else
-        channel = handles.map.particleChannel.Value-1;
-        handles.map.particleFilter.JavaPeer.set('Value', round(particleSettings(channel).filterSize * handles.map.particleFilter.JavaPeer.get('Maximum') / 5));
-        handles.map.particleIntensity.JavaPeer.set('LowValue', particleSettings(channel).minIntensity);
-        handles.map.particleIntensity.JavaPeer.set('HighValue', particleSettings(channel).maxIntensity);
-    end
-
-    
-end
-
 function switchDisplayAxes(hObject, value)
     handles = guidata(hObject);
     
@@ -929,7 +884,7 @@ function onDisplay(hObject,handles)
     set(handles.axesControl.currentFrame.JavaPeer,'Maximum',size(stack,3));
     set(handles.axesControl.currentFrame.JavaPeer,'Value', getappdata(handles.f,'mapping_currentFrame'));
     set(handles.axesControl.currentFrameTextbox,'String', num2str(getappdata(handles.f,'mapping_currentFrame')));
-    handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
+    handles.axesControl.currentFrame.JavaPeer.set('StateChangedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
     handles.axesControl.currentFrameTextbox.set('Callback', @(hObject,~) setCurrentFrame( hObject, str2num(hObject.String)));
     % play button
     handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
@@ -979,6 +934,79 @@ function updateMagnifcation(hObject,mag)
     end
 end
 
+%% Particle Detection
+function updateParticleDetection(hObject)
+    hWaitBar = waitbar(0,'loading ...', 'WindowStyle', 'modal');
+    
+    handles = guidata(hObject);
+    particleSettings = getappdata(handles.f,'mapping_particleSettings');
+    numChannels = size(particleSettings,2);
+        
+    if handles.map.particleChannel.Value == 1
+        for c=1:numChannels
+            particleSettings(c).filterSize = handles.map.particleFilter.JavaPeer.get('Value') / handles.map.particleFilter.JavaPeer.get('Maximum') * 5;
+            particleSettings(c).minIntensity = handles.map.particleIntensity.JavaPeer.get('LowValue');
+            particleSettings(c).maxIntensity = handles.map.particleIntensity.JavaPeer.get('HighValue');
+        end
+    else
+        channel = handles.map.particleChannel.Value-1;
+        particleSettings(channel).filterSize = handles.map.particleFilter.JavaPeer.get('Value') / handles.map.particleFilter.JavaPeer.get('Maximum') * 5;
+        particleSettings(channel).minIntensity = handles.map.particleIntensity.JavaPeer.get('LowValue');
+        particleSettings(channel).maxIntensity = handles.map.particleIntensity.JavaPeer.get('HighValue');
+    end
+    setappdata(handles.f,'mapping_particleSettings',particleSettings); % save
+    
+    updateDisplay(hObject,handles,1); % parameter '1' added to add particles
+    
+    delete(hWaitBar);
+end
+
+function particleDetectionChangeChannel(hObject,handles)
+    particleSettings = getappdata(handles.f,'mapping_particleSettings');
+    numChannels = size(particleSettings,2);
+    
+    if handles.map.particleChannel.Value == 1
+        for c=1:numChannels
+            handles.map.particleFilter.JavaPeer.set('Value', round(particleSettings(c).filterSize * handles.map.particleFilter.JavaPeer.get('Maximum') / 5));
+            handles.map.particleIntensity.JavaPeer.set('LowValue', particleSettings(c).minIntensity);
+            handles.map.particleIntensity.JavaPeer.set('HighValue', particleSettings(c).maxIntensity);
+        end
+    else
+        channel = handles.map.particleChannel.Value-1;
+        handles.map.particleFilter.JavaPeer.set('Value', round(particleSettings(channel).filterSize * handles.map.particleFilter.JavaPeer.get('Maximum') / 5));
+        handles.map.particleIntensity.JavaPeer.set('LowValue', particleSettings(channel).minIntensity);
+        handles.map.particleIntensity.JavaPeer.set('HighValue', particleSettings(channel).maxIntensity);
+    end
+
+    
+end
+
+function autoAdjustParticleSelection(hObject, handles)
+    numROI =            handles.map.numberROITextBox.Value+1;
+    maxIntensity =      getappdata(handles.f,'mapping_maxIntensity');
+    particleSettings =  getappdata(handles.f,'mapping_particleSettings');
+    seperatedStacks =   getappdata(handles.f,'data_mapping_originalSeperatedStacks');
+    
+    for i=1:numROI
+        particleSettings(i).filterSize = 1;
+        
+        currentFrame = get(handles.axesControl.currentFrame.JavaPeer,'Value');
+        if handles.map.timeAvgCheckbox.Value
+            I = timeAvgStack(seperatedStacks{i});
+        else
+            I = seperatedStacks{i}(:,:,currentFrame);
+        end
+        intensityLims = stretchlim(I,.001);
+        particleSettings(i).minIntensity = maxIntensity*intensityLims(2);
+        particleSettings(i).maxIntensity = maxIntensity;
+    end
+    
+    setappdata(handles.f,'mapping_particleSettings',particleSettings);
+    particleDetectionChangeChannel(hObject,handles);
+    updateParticleDetection(hObject);
+    handles.map.particleChannel.Value = 2;
+end
+
 %% Registration
 function registerMapping(hObject,handles)
     setappdata(handles.f,'isMapped',1);
@@ -997,8 +1025,9 @@ function playVideo(hObject,handles)
     setappdata(handles.f,'Playing_Video',1);
     currentFrame = handles.axesControl.currentFrame.JavaPeer.get('Value');
     while getappdata(handles.f,'Playing_Video')
-        if currentFrame < handles.axesControl.currentFrame.JavaPeer.get('Maximum')
-            currentFrame = currentFrame+1;
+        playSpeed = getappdata(handles.f, 'playSpeed');
+        if currentFrame+playSpeed <= handles.axesControl.currentFrame.JavaPeer.get('Maximum')
+            currentFrame = currentFrame+playSpeed;
         else
             currentFrame = 1;
         end

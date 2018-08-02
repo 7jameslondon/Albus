@@ -1,6 +1,6 @@
 clc;
 clear;
-addpath('/Users/jameslondon/Documents/Fishel Lab/Albus/Albus 4/Tracking');
+addpath('/Users/jameslondon/Documents/Fishel Lab/Albus/Tracking');
 
 tic;
 %% GENERATE POSITIONS
