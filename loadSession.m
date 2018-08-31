@@ -46,6 +46,8 @@ function flag = loadSession(hObject)
         session.kym_highBrightness4 = 101;
         session.kym_highBrightness5 = 101;
         session.kym_highBrightness6 = 101;
+        
+        session.kym_syncBrightness = 0;
     end
     
     
