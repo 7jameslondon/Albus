@@ -174,7 +174,7 @@ function handles = createInterface(handles)
                'String', 'Add group',...
                'Callback', @(hObject,~) addGroup(hObject,guidata(hObject)));
            
-    handles.tra.group.box.set('heights', [140, 25]);
+    handles.tra.group.box.set('heights', [150, 25]);
     
     %% Exports
     handles.tra.exportPanel = uix.BoxPanel(  'Parent', handles.tra.leftPanel,...
@@ -212,7 +212,7 @@ function handles = createInterface(handles)
                                                 'Callback', @(hObject,~) showPSH(hObject,guidata(hObject)));
                                                  
     %% 
-    handles.tra.leftPanel.set('Heights',[25 200 80 75 200 250]);
+    handles.tra.leftPanel.set('Heights',[25 200 80 75 203 250]);
     
     
     %% Right panel
@@ -268,13 +268,28 @@ function handles = createInterface(handles)
     % grid
     handles.tra.graphGrid = uix.GridFlex('Parent', handles.tra.graphPanel, 'Spacing', 5);
     
-    [~, handles.tra.DAScale] = javacomponent('javax.swing.JSlider');
-    handles.tra.DAScale.set('Parent', handles.tra.graphGrid);
-    handles.tra.DAScale.JavaPeer.set('Maximum', 10e6);
+    handles.tra.DAScaleBox = uix.VBox('Parent', handles.tra.graphGrid);
+    
+    uicontrol('Parent', handles.tra.DAScaleBox,...
+              'String', 'Auto',...
+              'Style', 'text');
+    
+    handles.tra.DAScaleAuto = uicontrol('Parent', handles.tra.DAScaleBox,...
+                                        'String', '',...
+                                        'Style', 'Checkbox');
+    
+    [~, handles.tra.DAScale] = javacomponent('com.jidesoft.swing.RangeSlider');
+    handles.tra.DAScale.set('Parent', handles.tra.DAScaleBox);
+    handles.tra.DAScale.JavaPeer.set('Maximum', 11e6);
     handles.tra.DAScale.JavaPeer.set('Minimum', 0);
-    handles.tra.DAScale.JavaPeer.set('Value', 0);
-    handles.tra.DAScale.JavaPeer.set('StateChangedCallback', @(~,~) setScale(handles.tra.DAScale, handles.tra.DAScale.JavaPeer.get('Value')/handles.tra.DAScale.JavaPeer.get('Maximum')*10));
+    handles.tra.DAScale.JavaPeer.set('LowValue', 0);
+    handles.tra.DAScale.JavaPeer.set('HighValue', 11e6);
+    handles.tra.DAScale.JavaPeer.set('StateChangedCallback', @(~,~) setScale(handles.tra.DAScale,...
+        handles.tra.DAScale.JavaPeer.get('LowValue')/handles.tra.DAScale.JavaPeer.get('Maximum')*11,...
+        handles.tra.DAScale.JavaPeer.get('HighValue')/handles.tra.DAScale.JavaPeer.get('Maximum')*11));
     handles.tra.DAScale.JavaPeer.set('Orientation',handles.tra.DAScale.JavaPeer.VERTICAL);
+    
+    handles.tra.DAScaleBox.set('Heights',[15 15 -1]);
     
     uix.Empty('Parent', handles.tra.graphGrid);
     handles.tra.DAAxes              = axes(handles.tra.graphGrid);
@@ -291,8 +306,8 @@ function handles = createInterface(handles)
     
     handles.tra.DonorPlot.LineWidth         = 2;
     handles.tra.AcceptorPlot.LineWidth      = 2;
-    handles.tra.DonorStatePlot.LineWidth    = 1;
-    handles.tra.AcceptorStatePlot.LineWidth = 1;
+    handles.tra.DonorStatePlot.LineWidth    = 2;
+    handles.tra.AcceptorStatePlot.LineWidth = 2;
     
     handles.tra.DonorPlot.Color         = [38.8, 58.4, 00.0]/100;
     handles.tra.AcceptorPlot.Color      = [85.5, 13.7, 13.7]/100;
@@ -344,16 +359,29 @@ function handles = loadFromSession(hObject,handles,session)
     
     handles.tra.removeBGCheckbox.Value = session.tra_removeBG;
     
-    set(handles.tra.DAScale.JavaPeer, 'Value', session.tra_DAScale);
+    handles.tra.DAScaleAuto.Value = session.tra_DAScaleAuto;
+    set(handles.tra.DAScale.JavaPeer, 'LowValue', session.tra_DAScale(1));
+    set(handles.tra.DAScale.JavaPeer, 'HighValue', session.tra_DAScale(2));
     
-    % groups
-    groupHandles = getappdata(handles.f,'trace_groupHandles');
-            tra_groups = cell(size(groupHandles,1),2);
-            for i = 1:size(groupHandles,1)
-                tra_groups{i,1} = groupHandles{i,1}.get('String');
-                tra_groups{i,2} = groupHandles{i,2}.get('String');
-            end
-            session.tra_groups = tra_groups;
+    handles.tra.playSpeed.String = num2str(session.playSpeed);
+    
+    %% groups
+    % remove old groups
+    delete(handles.tra.group.grid.Children(6:size(handles.tra.group.grid.Children,1)));
+    setappdata(handles.f,'trace_groupHandles',cell(0,5));
+    
+    % add groups from session
+    for i = 1:size(session.tra_groups,1)
+        addGroup(hObject,handles,1);
+        
+        groupHandles = getappdata(handles.f,'trace_groupHandles');
+        
+        groupHandles{i,1}.set('String', session.tra_groups{i,1});
+        groupHandles{i,2}.set('String', session.tra_groups{i,2});
+        
+        setappdata(handles.f,'trace_groupHandles',groupHandles);
+    end
+    
 end
 
 %% Updates
@@ -386,9 +414,13 @@ function onDisplay(hObject,handles,loadingSession)
     updateMaxTraces(hObject, handles);
     setTrace(hObject,handles,1);
     setVidCurrentFrame(hObject, getappdata(handles.f,'home_currentFrame'));
-    scale = handles.tra.DAScale.JavaPeer.get('Value') / handles.tra.DAScale.JavaPeer.get('Maximum')*10;
-    scale = 10^-scale;
-    axis(handles.tra.DAAxes, [1, vidMax, -scale*0.1, scale*1.1]);
+    setScale(hObject, ...
+        handles.tra.DAScale.JavaPeer.get('LowValue') / ...
+        handles.tra.DAScale.JavaPeer.get('Maximum')*11, ...
+        handles.tra.DAScale.JavaPeer.get('HighValue') / ...
+        handles.tra.DAScale.JavaPeer.get('Maximum')*11)
+    ax = axis(handles.tra.DAAxes);
+    axis(handles.tra.DAAxes, [1, vidMax, ax(3), ax(4)]);
     
     % key presses, these get turned off by onRelease
     set(handles.f,'WindowKeyPressFcn',@keyPressCallback);
@@ -449,6 +481,10 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
             donorLimits     = getappdata(handles.f,'donorLimits');
             acceptorLimits  = getappdata(handles.f,'acceptorLimits');
             
+            if isempty(donorLimits)
+                return;
+            end
+            
             removeBG        = handles.tra.removeBGCheckbox.Value;
     
             traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2), removeBG);
@@ -494,6 +530,22 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
             groupHandles{i,3}.set('Value',traces.Groups(c,i));
         end
         setappdata(handles.f,'trace_groupHandles',groupHandles);
+        
+        % Auto scale axes if applicable
+        if handles.tra.DAScaleAuto.Value
+            lowDAV = min([traces.Donor(c,x), traces.Acceptor(c,x)])  * 0.9;
+            highDAV = max([traces.Donor(c,x), traces.Acceptor(c,x)]) * 1.1;
+            
+            highscalefix = 11-log10(1.1); % ensures max highvalue gives a scale of 1.1
+            highDA = log10(highDAV)+highscalefix;
+            lowDA  = (lowDAV*10/highDAV)+1;
+            
+            handles.tra.DAScale.JavaPeer.set('LowValue',lowDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11);
+            handles.tra.DAScale.JavaPeer.set('HighValue',highDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11);
+            handles.tra.DAScale.JavaPeer.set('LowValue',lowDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11); % do it twise incase high is initaly lower
+            
+            setScale(hObject,lowDA,highDA);
+        end
     end
 end
 
@@ -518,10 +570,15 @@ function saveTraceGroups(hObject,handles)
     setappdata(handles.f,'trace_groupHandles',groupHandles)
 end
 
-function addGroup(hObject,handles)
+function addGroup(hObject,handles,loadingFlag)
     groupHandles = getappdata(handles.f,'trace_groupHandles');
     
     numRows = size(groupHandles,1) + 1;
+    
+    if numRows > 5
+        uiwait(msgbox('Only 5 groups allowed.'));
+        return;
+    end
     
     % names
     groupHandles{numRows, 1} = uicontrol(   'Parent', handles.tra.group.grid,...
@@ -557,15 +614,18 @@ function addGroup(hObject,handles)
     
     setappdata(handles.f,'trace_groupHandles',groupHandles);
     
-    
-    traces = getappdata(handles.f,'traces');
-    traces.Groups = [traces.Groups, zeros(size(traces,1),1,'logical')];
-    setappdata(handles.f,'traces',traces);
+    if ~exist('loadingFlag','var') || ~loadingFlag
+        traces = getappdata(handles.f,'traces');
+        traces.Groups = [traces.Groups, zeros(size(traces,1),1,'logical')];
+        setappdata(handles.f,'traces',traces);
+    end
 end
 
 function setGroupRule(hObject,rowNum)
     handles = guidata(hObject);
     groupHandles = getappdata(handles.f,'trace_groupHandles');
+    
+    answer = inputdlg(['Set group rule for group "' groupHandles{rowNum,1 '".'])
 end
 
 function deleteGroup(hObject,rowNum)
@@ -593,6 +653,7 @@ function deleteGroup(hObject,rowNum)
     traces = getappdata(handles.f,'traces');
     traces.Groups(:,rowNum) = [];
     setappdata(handles.f,'traces',traces);
+    saveTraceGroups(hObject,handles);
 end
 
 %% Selected Trace
@@ -652,6 +713,7 @@ end
 function setVidCurrentFrame(hObject, value, videoOnlyFlag)
     handles = guidata(hObject);
     handles.tra.vidCurrentFrame.JavaPeer.set('Value', value);
+    handles.tra.currentFrameTextbox.set('String', num2str(value));
     setappdata(handles.f,'home_currentFrame', value);
     
     if exist('videoOnlyFlag','var')
@@ -701,7 +763,6 @@ function setPlaySpeed(hObject, handles, value)
 end
 
 %% Trace Data
-
 function preCalculateAllTraces(hObject, handles)
     % Get data
     traces          = getappdata(handles.f,'traces');
@@ -763,14 +824,19 @@ function trace = calculateTraceData(trace, movMeanWidth, x, minStates, maxStates
     trace.Calculated(1) = true;
 end
 
-%% Settings
-function setScale(hObject,value)
+%% DAScale
+function setScale(hObject,lowvalue,highvalue)
     handles = guidata(hObject);
-    ax = axis(handles.tra.DAAxes);        
-    scale = 10^-value;
-    axis(handles.tra.DAAxes,[ax(1), ax(2), -.1*scale, 1.01*scale]);
+    ax = axis(handles.tra.DAAxes); 
+    
+    highscalefix = 11-log10(1.1); % ensures max highvalue gives a scale of 1.1
+    highscale = 10^-(highscalefix-highvalue);
+    lowscale = ((lowvalue-1)*highscale/10);
+    
+    axis(handles.tra.DAAxes,[ax(1), ax(2), lowscale, highscale]);
 end
 
+%% Settings
 function setCut(hObject)
     handles = guidata(hObject);
     handles.tra.preCalButton.Enable = 'on';
@@ -788,6 +854,8 @@ function setCut(hObject)
     
     donorLimits = stretchlim(traces.Donor_raw(:,low:high));
     acceptorLimits = stretchlim(traces.Acceptor_raw(:,low:high));
+    
+    if isempty(donorLimits) return; end
     
     setappdata(handles.f,'donorLimits',donorLimits);
     setappdata(handles.f,'acceptorLimits',acceptorLimits);
