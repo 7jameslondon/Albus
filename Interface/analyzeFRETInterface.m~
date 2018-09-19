@@ -174,7 +174,7 @@ function handles = createInterface(handles)
                'String', 'Add group',...
                'Callback', @(hObject,~) addGroup(hObject,guidata(hObject)));
            
-    handles.tra.group.box.set('heights', [150, 25]);
+    handles.tra.group.box.set('heights', [140, 25]);
     
     %% Exports
     handles.tra.exportPanel = uix.BoxPanel(  'Parent', handles.tra.leftPanel,...
@@ -212,7 +212,7 @@ function handles = createInterface(handles)
                                                 'Callback', @(hObject,~) showPSH(hObject,guidata(hObject)));
                                                  
     %% 
-    handles.tra.leftPanel.set('Heights',[25 200 80 75 203 250]);
+    handles.tra.leftPanel.set('Heights',[25 200 80 75 200 250]);
     
     
     %% Right panel
@@ -346,23 +346,14 @@ function handles = loadFromSession(hObject,handles,session)
     
     set(handles.tra.DAScale.JavaPeer, 'Value', session.tra_DAScale);
     
-    %% groups
-    % remove old groups
-    delete(handles.tra.group.grid.Children(6:size(handles.tra.group.grid.Children,1)));
-    setappdata(handles.f,'trace_groupHandles',cell(0,5));
-    
-    % add groups from session
-    for i = 1:size(session.tra_groups,1)
-        addGroup(hObject,handles,1);
-        
-        groupHandles = getappdata(handles.f,'trace_groupHandles');
-        
-        groupHandles{i,1}.set('String', session.tra_groups{i,1});
-        groupHandles{i,2}.set('String', session.tra_groups{i,2});
-        
-        setappdata(handles.f,'trace_groupHandles',groupHandles);
-    end
-    
+    % groups
+    groupHandles = getappdata(handles.f,'trace_groupHandles');
+            tra_groups = cell(size(groupHandles,1),2);
+            for i = 1:size(groupHandles,1)
+                tra_groups{i,1} = groupHandles{i,1}.get('String');
+                tra_groups{i,2} = groupHandles{i,2}.get('String');
+            end
+            session.tra_groups = tra_groups;
 end
 
 %% Updates
@@ -527,15 +518,10 @@ function saveTraceGroups(hObject,handles)
     setappdata(handles.f,'trace_groupHandles',groupHandles)
 end
 
-function addGroup(hObject,handles,loadingFlag)
+function addGroup(hObject,handles)
     groupHandles = getappdata(handles.f,'trace_groupHandles');
     
     numRows = size(groupHandles,1) + 1;
-    
-    if numRows > 5
-        uiwait(msgbox('Only 5 groups allowed.'));
-        return;
-    end
     
     % names
     groupHandles{numRows, 1} = uicontrol(   'Parent', handles.tra.group.grid,...
@@ -571,11 +557,10 @@ function addGroup(hObject,handles,loadingFlag)
     
     setappdata(handles.f,'trace_groupHandles',groupHandles);
     
-    if ~exist('loadingFlag','var') || ~loadingFlag
-        traces = getappdata(handles.f,'traces');
-        traces.Groups = [traces.Groups, zeros(size(traces,1),1,'logical')];
-        setappdata(handles.f,'traces',traces);
-    end
+    
+    traces = getappdata(handles.f,'traces');
+    traces.Groups = [traces.Groups, zeros(size(traces,1),1,'logical')];
+    setappdata(handles.f,'traces',traces);
 end
 
 function setGroupRule(hObject,rowNum)
@@ -608,7 +593,6 @@ function deleteGroup(hObject,rowNum)
     traces = getappdata(handles.f,'traces');
     traces.Groups(:,rowNum) = [];
     setappdata(handles.f,'traces',traces);
-    saveTraceGroups(hObject,handles);
 end
 
 %% Selected Trace

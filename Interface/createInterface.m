@@ -50,6 +50,14 @@ function handles = createInterface(varargin)
                         'Visible', 'off',...
                         'DeleteFcn', @(hObject,~) closeProgram(hObject,guidata(hObject)));
     end
+    
+    %% setup menubar
+    handles.menu = struct;
+    handles.menu.m = uimenu(handles.f,'Text','File');
+    handles.menu.exportColocalizedVideo = uimenu(handles.menu.m,...
+                        'Text','Export co-localized video file',...
+                        'MenuSelectedFcn', @(hObject,~) exportColocalizedVideo(hObject),...
+                        'Enable', 'off');
 
     %% main framework
     handles.HBox = uix.HBox('Parent', handles.f);

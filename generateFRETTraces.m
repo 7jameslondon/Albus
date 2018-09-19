@@ -104,7 +104,8 @@ function generateFRETTraces(hObject, handles)
     traces.FRET_hmm     = preAloc;
     traces.Donor_bg     = zeros(numTraces,1);
     traces.Acceptor_bg  = zeros(numTraces,1);
-    traces.Calculated  = zeros(numTraces,1,'logical');
+    traces.Calculated   = zeros(numTraces,1,'logical');
+    traces.Groups       = zeros(numTraces,0,'logical');
         
     setappdata(handles.f,'traces',traces);
     

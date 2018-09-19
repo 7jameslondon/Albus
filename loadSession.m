@@ -102,7 +102,9 @@ function flag = loadSession(hObject)
         case 'Mapping'
             homeInterface('openMapping',hObject);
         case 'Video Settings'
-            homeInterface('openVideoSettings',hObject);d
+            homeInterface('openVideoSettings',hObject);
+        case 'Drift'
+            homeInterface('openDriftCorrection',hObject);
         case 'Select DNA'
             homeInterface('openSelectDNA',hObject);
         case 'Kymographs'

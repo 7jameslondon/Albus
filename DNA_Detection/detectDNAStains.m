@@ -11,7 +11,7 @@ function detectDNAStains(hObject, handles)
     I = adapthisteq(I,'Distribution','rayleigh','ClipLimit',0.005);
 
     c = normxcorr2(dnaKernal,I);
-    c = normalize(c,'range'); % normalize between 0 and 1
+    c = mat2gray(c); % normalize between 0 and 1
 
     c = imhmax(c,mean(c(:)));
     regMax = imregionalmax(c);

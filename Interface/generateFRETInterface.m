@@ -77,7 +77,7 @@ function handles = createInterface(handles)
     handles.fret.brightness.JavaPeer.set('HighValue', 1e6);
     handles.fret.brightness.JavaPeer.set('PaintTicks',true);
     handles.fret.brightness.JavaPeer.set('MajorTickSpacing',1e5);
-    handles.fret.brightness.JavaPeer.set('StateChangedCallback', @(~,~) setBrightness(handles.fret.brightness));
+    handles.fret.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.fret.brightness));
     
     % auto brightness and invert box
     handles.fret.autoAndInvertHBox = uix.HBox('Parent', handles.fret.preProcBox);
@@ -112,7 +112,7 @@ function handles = createInterface(handles)
     handles.fret.particleFilter.JavaPeer.set('Maximum', 5e5);
     handles.fret.particleFilter.JavaPeer.set('Minimum', 0);
     handles.fret.particleFilter.JavaPeer.set('Value', 0);
-    handles.fret.particleFilter.JavaPeer.set('StateChangedCallback', @(~,~) updateDisplay(handles.fret.particleFilter));
+    handles.fret.particleFilter.JavaPeer.set('MouseReleasedCallback', @(~,~) updateDisplay(handles.fret.particleFilter));
     % add filter lables
     parFilLabels = java.util.Hashtable();
     parFilLabels.put( int32( 0 ),   javax.swing.JLabel('0') );
@@ -134,8 +134,9 @@ function handles = createInterface(handles)
     handles.fret.particleIntensity.JavaPeer.set('Minimum', 0);
     handles.fret.particleIntensity.JavaPeer.set('LowValue', 9e5);
     handles.fret.particleIntensity.JavaPeer.set('HighValue', 1e6);
-    handles.fret.particleIntensity.JavaPeer.set('StateChangedCallback', @(~,~) updateDisplay(handles.fret.particleIntensity));
+    handles.fret.particleIntensity.JavaPeer.set('MouseReleasedCallback', @(~,~) updateDisplay(handles.fret.particleIntensity));
     
+    handles.fret.autoBox.set('Heights',[15, 45 15 35]);
     %% Remove Clusters
     handles.fret.clusterPanel = uix.BoxPanel('Parent', handles.fret.leftPanel,...
                                            'Title','Remove Clusters',...
@@ -175,7 +176,7 @@ function handles = createInterface(handles)
     handles.fret.eccentricitySlider.JavaPeer.set('Maximum', 1e6);
     handles.fret.eccentricitySlider.JavaPeer.set('Minimum', 0);
     handles.fret.eccentricitySlider.JavaPeer.set('Value', 0);
-    handles.fret.eccentricitySlider.JavaPeer.set('StateChangedCallback', @(~,~) setEccentricity(handles.fret.eccentricitySlider, handles.fret.eccentricitySlider.JavaPeer.get('Value')/handles.fret.eccentricitySlider.JavaPeer.get('Maximum')));
+    handles.fret.eccentricitySlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setEccentricity(handles.fret.eccentricitySlider, handles.fret.eccentricitySlider.JavaPeer.get('Value')/handles.fret.eccentricitySlider.JavaPeer.get('Maximum')));
     % widths
     handles.fret.eccentricityBox.set('Widths', [30, -1]);
     
@@ -197,7 +198,7 @@ function handles = createInterface(handles)
     handles.fret.minDistanceSlider.JavaPeer.set('Maximum', 20e6);
     handles.fret.minDistanceSlider.JavaPeer.set('Minimum', 0);
     handles.fret.minDistanceSlider.JavaPeer.set('Value', 5e6);
-    handles.fret.minDistanceSlider.JavaPeer.set('StateChangedCallback', @(~,~) setMinDistance(handles.fret.minDistanceSlider,handles.fret.minDistanceSlider.JavaPeer.get('Value')/handles.fret.minDistanceSlider.JavaPeer.get('Maximum')*20));
+    handles.fret.minDistanceSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setMinDistance(handles.fret.minDistanceSlider,handles.fret.minDistanceSlider.JavaPeer.get('Value')/handles.fret.minDistanceSlider.JavaPeer.get('Maximum')*20));
     % widths
     handles.fret.minDistanceBox.set('Widths', [30, -1]);
     
@@ -219,7 +220,7 @@ function handles = createInterface(handles)
     handles.fret.edgeDistanceSlider.JavaPeer.set('Maximum', 20e6);
     handles.fret.edgeDistanceSlider.JavaPeer.set('Minimum', 0);
     handles.fret.edgeDistanceSlider.JavaPeer.set('Value', 5e6);
-    handles.fret.edgeDistanceSlider.JavaPeer.set('StateChangedCallback', @(~,~) setEdgeDistance(handles.fret.edgeDistanceSlider, handles.fret.edgeDistanceSlider.JavaPeer.get('Value')/handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum')*20));
+    handles.fret.edgeDistanceSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setEdgeDistance(handles.fret.edgeDistanceSlider, handles.fret.edgeDistanceSlider.JavaPeer.get('Value')/handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum')*20));
     % widths
     handles.fret.edgeDistanceBox.set('Widths', [30, -1]);
     
@@ -238,7 +239,7 @@ function handles = createInterface(handles)
                                             'Callback', @(hObject,~) openTraces(hObject, guidata(hObject)));
                                                  
     %% 
-    handles.fret.leftPanel.set('Heights',[25 200 125 175 60]);
+    handles.fret.leftPanel.set('Heights',[25 200 135 175 60]);
 end
 
 %% Load from session
@@ -300,9 +301,9 @@ function handles = loadFromSession(hObject,handles,session)
     handles.fret.eccentricitySlider.JavaPeer.set('Value', session.fret_eccentricity);
     handles.fret.minDistanceSlider.JavaPeer.set('Value', session.fret_minDistance);
     handles.fret.edgeDistanceSlider.JavaPeer.set('Value', session.fret_edgeDistance);
-    handles.fret.eccentricityTextBox.String = num2str(session.fret_eccentricity);
-    handles.fret.minDistanceTextBox.String = num2str(session.fret_minDistance);
-    handles.fret.edgeDistanceTextBox.String = num2str(session.fret_edgeDistance);
+    handles.fret.eccentricityTextBox.String = num2str(session.fret_eccentricity / handles.fret.eccentricitySlider.JavaPeer.get('Maximum'));
+    handles.fret.minDistanceTextBox.String = num2str(session.fret_minDistance / handles.fret.minDistanceSlider.JavaPeer.get('Maximum') * 20);
+    handles.fret.edgeDistanceTextBox.String = num2str(session.fret_edgeDistance / handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum') * 20);
         
     switchMode(hObject, handles, session.fret_mode);
 end
@@ -415,7 +416,7 @@ function onDisplay(hObject,handles)
     set(handles.axesControl.currentFrame.JavaPeer,'Maximum',size(stack,3));
     set(handles.axesControl.currentFrame.JavaPeer,'Value', getappdata(handles.f,'fret_currentFrame'));
     set(handles.axesControl.currentFrameTextbox,'String', num2str(getappdata(handles.f,'fret_currentFrame')));
-    handles.axesControl.currentFrame.JavaPeer.set('StateChangedCallback', ...
+    handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', ...
         @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
     handles.axesControl.currentFrameTextbox.set('Callback', @(hObject,~) setCurrentFrame( hObject, str2num(hObject.String)));
     handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
@@ -533,7 +534,9 @@ function switchMode(hObject, handles, value)
             handles.fret.tracePanel.Visible = 'on';
             handles.fret.clusterPanel.Visible = 'on';
             handles.fret.edgePanel.Visible = 'on';
-            updateDisplay(hObject,handles);
+            if strcmp(getappdata(handles.f,'mode'),'Select FRET')
+                updateDisplay(hObject,handles);
+            end
             handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag()); % update magnification
         case 'Edit Import'
             handles.rightPanel.Visible = 'on';
@@ -544,7 +547,9 @@ function switchMode(hObject, handles, value)
             handles.fret.tracePanel.Visible = 'on';
             handles.fret.clusterPanel.Visible = 'on';
             handles.fret.edgePanel.Visible = 'on';
-            updateDisplay(hObject,handles);
+            if strcmp(getappdata(handles.f,'mode'),'Select FRET')
+                updateDisplay(hObject,handles);
+            end
             handles.oneAxes.AxesAPI.setMagnification(handles.oneAxes.AxesAPI.findFitMag()); % update magnification
     end
     
@@ -761,9 +766,9 @@ function openTraces(hObject,handles,loadingSession)
     onRelease(hObject,handles);
     
     if exist('loadingSession','var')
-        tracesInterface('onDisplay',hObject,handles,loadingSession);
+        analyzeFRETInterface('onDisplay',hObject,handles,loadingSession);
     else
-        tracesInterface('onDisplay',hObject,handles);
+        analyzeFRETInterface('onDisplay',hObject,handles);
     end
     handles.leftPanel.Selection = 7;
 end

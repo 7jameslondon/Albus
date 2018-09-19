@@ -34,7 +34,7 @@ function calculateROIMask(~,handles)
     % Calculate mask from drift
     if handles.drift.applyCorrection.Value
         % Output view
-        outputview = imref2d(seperatedSize);
+        outputview = imref2d(size(combinedROIMask));
         
         originalROIMask = combinedROIMask;
         

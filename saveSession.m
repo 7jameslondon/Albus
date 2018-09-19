@@ -150,6 +150,14 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             
             session.tra_removeBG        = handles.tra.removeBGCheckbox.Value;
             
+            groupHandles = getappdata(handles.f,'trace_groupHandles');
+            tra_groups = cell(size(groupHandles,1),2);
+            for i = 1:size(groupHandles,1)
+                tra_groups{i,1} = groupHandles{i,1}.get('String');
+                tra_groups{i,2} = groupHandles{i,2}.get('String');
+            end
+            session.tra_groups = tra_groups;
+            
        %% Analyze FRET Traces
         % this data will always be saved unlike the above
             session.flowStrechingProfiles= getappdata(handles.f,'flowStrechingProfiles');

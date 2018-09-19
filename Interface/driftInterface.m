@@ -50,7 +50,7 @@ function handles = createInterface(handles)
     handles.drift.brightness.JavaPeer.set('HighValue', 1e6);
     handles.drift.brightness.JavaPeer.set('PaintTicks',true);
     handles.drift.brightness.JavaPeer.set('MajorTickSpacing',1e5);
-    handles.drift.brightness.JavaPeer.set('MouseMovedCallback', @(~,~) setBrightness(handles.drift.brightness));
+    handles.drift.brightness.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.drift.brightness));
     
     % box for auto, invert and time average
     handles.drift.autoAndInvertHBox = uix.HBox('Parent', handles.drift.preProcVBox);
@@ -80,7 +80,7 @@ function handles = createInterface(handles)
     handles.drift.meanSlider.JavaPeer.set('Maximum', 20);
     handles.drift.meanSlider.JavaPeer.set('Minimum', 1);
     handles.drift.meanSlider.JavaPeer.set('Value', 1);
-    handles.drift.meanSlider.JavaPeer.set('StateChangedCallback', @(~,~) setMean_Slider(handles.drift.meanSlider));
+    handles.drift.meanSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setMean_Slider(handles.drift.meanSlider));
     handles.drift.meanBox.set('Widths',[30, -1]);
                                                 
     %% Particle Selection
@@ -104,7 +104,7 @@ function handles = createInterface(handles)
     handles.drift.particleFilter.JavaPeer.set('Maximum', 5e5);
     handles.drift.particleFilter.JavaPeer.set('Minimum', 0);
     handles.drift.particleFilter.JavaPeer.set('Value', 0);
-    handles.drift.particleFilter.JavaPeer.set('MouseMovedCallback', @(~,~) updateDisplay(handles.drift.particleFilter));
+    handles.drift.particleFilter.JavaPeer.set('MouseReleasedCallback', @(~,~) updateDisplay(handles.drift.particleFilter));
     % add filter lables
     parFilLabels = java.util.Hashtable();
     parFilLabels.put( int32( 0 ),   javax.swing.JLabel('0') );
@@ -130,7 +130,7 @@ function handles = createInterface(handles)
     handles.drift.particleIntensity.JavaPeer.set('HighValue', 1e6);
     handles.drift.particleIntensity.JavaPeer.set('PaintTicks',true);
     handles.drift.particleIntensity.JavaPeer.set('MajorTickSpacing',1e5);
-    handles.drift.particleIntensity.JavaPeer.set('MouseMovedCallback', @(~,~) setBrightness(handles.drift.particleIntensity));
+    handles.drift.particleIntensity.JavaPeer.set('MouseReleasedCallback', @(~,~) setBrightness(handles.drift.particleIntensity));
     
     uix.Empty('Parent', handles.drift.particleSelectionVBox);
     
@@ -143,7 +143,7 @@ function handles = createInterface(handles)
     handles.drift.maxDistance.JavaPeer.set('Maximum', 10e5);
     handles.drift.maxDistance.JavaPeer.set('Minimum', 0);
     handles.drift.maxDistance.JavaPeer.set('Value', 0);
-    handles.drift.maxDistance.JavaPeer.set('MouseMovedCallback', @(~,~) updateDisplay(handles.drift.maxDistance));
+    handles.drift.maxDistance.JavaPeer.set('MouseReleasedCallback', @(~,~) updateDisplay(handles.drift.maxDistance));
     % add max distance lables
     parFilLabels = java.util.Hashtable();
     parFilLabels.put( int32( 0 ),   javax.swing.JLabel('0') );
@@ -159,20 +159,27 @@ function handles = createInterface(handles)
     
     %% Apply Correction
     handles.drift.applyCorrectionPanel = uix.Panel(     'Parent', handles.drift.leftPanel);
-    handles.drift.applyCorrectionVBox  = uix.VButtonBox( 'Parent', handles.drift.applyCorrectionPanel, ...
-                                                        'ButtonSize', [250, 25]);
+    handles.drift.applyCorrectionVBox  = uix.VBox( 'Parent', handles.drift.applyCorrectionPanel);
 
     handles.drift.applyCorrection = uicontrol(  'Parent', handles.drift.applyCorrectionVBox,...
                                                 'Style', 'checkbox',...
                                                 'String', 'Apply Drift Correction (takes a few minutes)',...
                                                 'Callback', @(hObject,~) applyCorrection(hObject, guidata(hObject),hObject.Value));
                                             
+    handles.drift.driftVectorAxes = polaraxes(handles.drift.applyCorrectionVBox);
+    polarplot(handles.drift.driftVectorAxes,0,0);
+    handles.drift.driftVectorAxes.RTickLabel = [];
+    handles.drift.driftVectorAxes.ThetaTickLabel = [];
+    
+    uix.Empty('Parent', handles.drift.applyCorrectionVBox);
+                                            
     handles.drift.doneButton      = uicontrol('Parent',   handles.drift.applyCorrectionVBox,...
                                               'String',   'Done',...
                                           	  'Callback', @(hObject,~) onRelease(hObject,guidata(hObject)));
-    
+                                          
+    handles.drift.applyCorrectionVBox.set('Heights',[30, 150, 10, 25]);
     %%
-    handles.drift.leftPanel.set('Heights',[25, 210, 240, 60]);
+    handles.drift.leftPanel.set('Heights',[25, 210, 240, 220]);
 end
 
 %% Load session
@@ -244,6 +251,13 @@ function onDisplay(hObject,handles)
 end
 
 function onRelease(hObject,handles)    
+    plt = getappdata(handles.f,'data_drift_plt');
+    if ~isempty(plt)
+        delete(plt);
+    end
+    plt = [];
+    setappdata(handles.f,'data_drift_plt',plt);
+    
     setappdata(handles.f,'data_drift_stack',[]);
     setappdata(handles.f,'data_drift_seperatedStacks',[]);
     homeInterface('openHome',hObject);
@@ -295,6 +309,13 @@ function updateDisplay(hObject,handles)
         hold(handles.oneAxes.Axes,'off');
         setappdata(handles.f,'data_drift_plt',plt);
         
+    else
+        plt = getappdata(handles.f,'data_drift_plt');
+        if ~isempty(plt)
+            delete(plt);
+        end
+        plt = [];
+        setappdata(handles.f,'data_drift_plt',plt);
     end
 end
 
@@ -521,6 +542,10 @@ function applyCorrection(hObject, handles, value)
         else
             videoSettingInterface('postProcessVideo',hObject,handles);
         end
+        
+        %% plot drift vector
+        [driftTheta, driftR] = cart2pol(drift(:,1),drift(:,2));
+        polarplot(handles.drift.driftVectorAxes, driftTheta, driftR);
 
         delete(hWaitBar);
     else
@@ -531,6 +556,11 @@ function applyCorrection(hObject, handles, value)
         else
             videoSettingInterface('postProcessVideo',hObject,handles);
         end
+        
+        polarplot(handles.drift.driftVectorAxes,0,0);
     end
+    
+    handles.drift.driftVectorAxes.RTickLabel = [];
+    handles.drift.driftVectorAxes.ThetaTickLabel = [];
 end
 
