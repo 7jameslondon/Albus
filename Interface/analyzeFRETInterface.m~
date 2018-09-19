@@ -108,6 +108,13 @@ function handles = createInterface(handles)
                                             'String', '/1',...
                                             'Style', 'text',...
                                             'HorizontalAlignment', 'left');
+                                        
+    % hide hidden groups
+    handles.tra.skipHiddenGroups = uicontrol(  'Parent', handles.tra.selectionBox,...
+                                               'Style' , 'Checkbox', ...
+                                               'Value', 0,...
+                                               'String', 'Skip hidden groups',...
+                                               'Callback', @(hObject,~) updateDisplay(hObject,guidata(hObject)));
                                     
     %% HMM Settings
     handles.tra.hmmPanel = uix.BoxPanel(  'Parent', handles.tra.leftPanel,...
@@ -150,6 +157,9 @@ function handles = createInterface(handles)
     
     % group headers
     uicontrol( 'Parent', handles.tra.group.grid,...
+               'String', 'Show Group',...
+               'Style', 'text');
+    uicontrol( 'Parent', handles.tra.group.grid,...
                'String', 'Name',...
                'Style', 'text');
     uicontrol( 'Parent', handles.tra.group.grid,...
@@ -165,10 +175,10 @@ function handles = createInterface(handles)
                 'String', 'Remove',...
                 'Style', 'text');
             
-    setappdata(handles.f,'trace_groupHandles',cell(0,5));
+    setappdata(handles.f,'trace_groupHandles',cell(0,6));
             
     handles.tra.group.grid.set('Heights',25);
-    handles.tra.group.grid.set('Widths',[-1 -1 -1 -1 -1]);
+    handles.tra.group.grid.set('Widths',[-1 -1 -1 -1 -1 -1]);
     
     uicontrol( 'Parent', handles.tra.group.box,...
                'String', 'Add group',...
@@ -212,7 +222,7 @@ function handles = createInterface(handles)
                                                 'Callback', @(hObject,~) showPSH(hObject,guidata(hObject)));
                                                  
     %% 
-    handles.tra.leftPanel.set('Heights',[25 200 80 75 203 250]);
+    handles.tra.leftPanel.set('Heights',[25 200 110 75 203 250]);
     
     
     %% Right panel
@@ -333,6 +343,8 @@ end
 
 %% Load from session
 function handles = loadFromSession(hObject,handles,session)
+    handles.tra.skipHiddenGroups.Value = 0; % initally set to 0, session value 
+    
 	setappdata(handles.f,'traces', session.tra_traces);
     
     if isempty(session.tra_traces) || any(~session.tra_traces.Calculated)
@@ -367,8 +379,8 @@ function handles = loadFromSession(hObject,handles,session)
     
     %% groups
     % remove old groups
-    delete(handles.tra.group.grid.Children(6:size(handles.tra.group.grid.Children,1)));
-    setappdata(handles.f,'trace_groupHandles',cell(0,5));
+    delete(handles.tra.group.grid.Children(7:size(handles.tra.group.grid.Children,1)));
+    setappdata(handles.f,'trace_groupHandles',cell(0,6));
     
     % add groups from session
     for i = 1:size(session.tra_groups,1)
@@ -376,11 +388,14 @@ function handles = loadFromSession(hObject,handles,session)
         
         groupHandles = getappdata(handles.f,'trace_groupHandles');
         
-        groupHandles{i,1}.set('String', session.tra_groups{i,1});
+        groupHandles{i,1}.set('Value', session.tra_groups{i,1});
         groupHandles{i,2}.set('String', session.tra_groups{i,2});
+        groupHandles{i,3}.set('String', session.tra_groups{i,3});
         
         setappdata(handles.f,'trace_groupHandles',groupHandles);
     end
+    
+    handles.tra.skipHiddenGroups.Value = session.tra_skipHiddenGroups;
     
 end
 
@@ -458,19 +473,60 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
     handles.tra.curFrameArrowFRET.set('Position',[curFrame 0]);
     
     if ~exist('videoOnlyFlag','var') % this is excluded when playing the video        
-        % Get required data
+        %% Get required data
         c = getappdata(handles.f,'trace_currentTrace');
         traces = getappdata(handles.f,'traces');
         startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
         endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
         x = (startT:endT);
         
-        % check everything is loaded
+        %% check everything is loaded
         if isempty(traces)
             return;
         end
         
-        % Calculate fret, background and hmm
+        %% Group Selection
+        groupHandles = getappdata(handles.f,'trace_groupHandles');
+        numGroups = size(groupHandles,1);
+        
+        % skip if this group is hidden
+        if handles.tra.skipHiddenGroups.Value
+            shownGroups = zeros(numGroups,1,'logical');
+            for i = 1:numGroups
+                shownGroups(i) = logical(groupHandles{i,1}.get('Value'));
+            end
+            
+            if ~any(traces.Groups(c,shownGroups))
+                % goto next trace shown trace
+                max_c = size(traces,1);
+                
+                showTraces = any(traces.Groups(:,shownGroups),2);
+                
+                if ~any(showTraces)
+                    handles.tra.skipHiddenGroups.Value = 0;
+                    uiwait(msgbox('All traces hidden'));
+                else
+                    shownTraces = find(showTraces);
+                    if any(shownTraces>c)
+                        shownTraces = shownTraces(shownTraces>c);
+                        nextTrace = shownTraces(1);
+                    else
+                        nextTrace = shownTraces(1);
+                    end
+                    setTrace(hObject,handles,nextTrace);
+                    updateDisplay(hObject,handles);
+                end
+                return;
+            end
+        end
+        
+        % Diplay selected groups
+        for i = 1:numGroups
+            groupHandles{i,4}.set('Value',traces.Groups(c,i));
+        end
+        setappdata(handles.f,'trace_groupHandles',groupHandles);
+        
+        %% Calculate fret, background and HMM
         if ~traces.Calculated(c)
             hWaitBar = waitbar(0,'loading...', 'WindowStyle', 'modal');
             
@@ -522,16 +578,8 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         setappdata(handles.f,'data_trace_plt',plt);
         mag = handles.tra.vidAxesAPI.getMagnification();
         handles.tra.vidAxesAPI.setMagnificationAndCenter(mag,traces.Center(c,1),traces.Center(c,2)); % center video scroll on current peak
-        
-        % Group Selection
-        groupHandles = getappdata(handles.f,'trace_groupHandles');
-        numGroups = size(groupHandles,1);
-        for i = 1:numGroups
-            groupHandles{i,3}.set('Value',traces.Groups(c,i));
-        end
-        setappdata(handles.f,'trace_groupHandles',groupHandles);
-        
-        % Auto scale axes if applicable
+                
+        %% Auto scale axes if applicable
         if handles.tra.DAScaleAuto.Value
             lowDAV = min([traces.Donor(c,x), traces.Acceptor(c,x)])  * 0.9;
             highDAV = max([traces.Donor(c,x), traces.Acceptor(c,x)]) * 1.1;
@@ -558,16 +606,17 @@ function saveTraceGroups(hObject,handles)
     numGroups = size(groupHandles,1);
     
     for i = 1:numGroups
-        traces.Groups(c,i) = groupHandles{i,3}.get('Value');
+        traces.Groups(c,i) = groupHandles{i,4}.get('Value');
     end
     
     % update the group counts
     for i = 1:numGroups
-        groupHandles{i,2}.set('String', num2str(sum(traces.Groups(:,i))));
+        groupHandles{i,3}.set('String', num2str(sum(traces.Groups(:,i))));
     end
     
     setappdata(handles.f,'traces',traces);
-    setappdata(handles.f,'trace_groupHandles',groupHandles)
+    setappdata(handles.f,'trace_groupHandles',groupHandles);
+    updateDisplay(hObject,handles);
 end
 
 function addGroup(hObject,handles,loadingFlag)
@@ -580,36 +629,42 @@ function addGroup(hObject,handles,loadingFlag)
         return;
     end
     
-    % names
+    % show
     groupHandles{numRows, 1} = uicontrol(   'Parent', handles.tra.group.grid,...
+                                            'Style', 'Checkbox',...
+                                            'Value', 1,...
+                                            'Callback', @(hObject,~) updateDisplay(hObject,guidata(hObject)));
+    
+    % names
+    groupHandles{numRows, 2} = uicontrol(   'Parent', handles.tra.group.grid,...
                                             'Style', 'edit',...
                                             'String', ['Group ' num2str(numRows)]);
                                         
     % size
-    groupHandles{numRows, 2} = uicontrol(   'Parent', handles.tra.group.grid,...
+    groupHandles{numRows, 3} = uicontrol(   'Parent', handles.tra.group.grid,...
                                             'Style', 'text',...
                                             'String', '0');
     % selected
-    groupHandles{numRows, 3} = uicontrol(   'Parent', handles.tra.group.grid,...
+    groupHandles{numRows, 4} = uicontrol(   'Parent', handles.tra.group.grid,...
                                             'Style', 'Checkbox',...
                                             'Value', 0,...
                                             'Callback', @(hObject,~) saveTraceGroups(hObject,guidata(hObject)));
                                         
     % rule
-    groupHandles{numRows, 4} = uicontrol(   'Parent', handles.tra.group.grid,...
+    groupHandles{numRows, 5} = uicontrol(   'Parent', handles.tra.group.grid,...
                                             'Callback', @(hObject,~) setGroupRule(hObject,numRows),...
                                             'String', 'Set');
                                         
     % delete
-    groupHandles{numRows, 5} = uicontrol(   'Parent', handles.tra.group.grid,...
+    groupHandles{numRows, 6} = uicontrol(   'Parent', handles.tra.group.grid,...
                                             'Callback', @(hObject,~) deleteGroup(hObject,numRows),...
                                             'String', 'X');
     
-    handles.tra.group.grid.set('Widths',[-1 -1 -1 -1 -1]);
+    handles.tra.group.grid.set('Widths',[-1 -1 -1 -1 -1 -1]);
     handles.tra.group.grid.set('Heights',ones(1,numRows+1)*25);
     
-    numOrderedObj = size(handles.tra.group.grid.Contents,1)-5;
-    groupSeq = [reshape(1:numOrderedObj,numOrderedObj/5,5); numOrderedObj+1:numOrderedObj+5];
+    numOrderedObj = size(handles.tra.group.grid.Contents,1)-6;
+    groupSeq = [reshape(1:numOrderedObj,numOrderedObj/6,6); numOrderedObj+1:numOrderedObj+6];
     handles.tra.group.grid.Contents = handles.tra.group.grid.Contents(groupSeq(:));
     
     setappdata(handles.f,'trace_groupHandles',groupHandles);
@@ -623,9 +678,26 @@ end
 
 function setGroupRule(hObject,rowNum)
     handles = guidata(hObject);
+
+    % promp user
     groupHandles = getappdata(handles.f,'trace_groupHandles');
+    prompt = ['Set group rule for ' groupHandles{rowNum,1}.get('String')];
+    ansArray = inputdlg(    prompt,... % prompt
+                            '',... % title
+                            [3 50]); % dims
+    if isempty(ansArray) % user selects cancel
+        return;
+    end
+    rule = ansArray{1};
     
-    answer = inputdlg(['Set group rule for group "' groupHandles{rowNum,1 '".'])
+    
+    % evluate prompt
+    traces = getappdata(handles.f,'traces');
+    results = eval(rule);
+    traces.Groups(:,rowNum) = results;
+    setappdata(handles.f,'traces',traces);
+    saveTraceGroups(hObject,handles);
+    updateDisplay(hObject,handles);
 end
 
 function deleteGroup(hObject,rowNum)
@@ -639,13 +711,14 @@ function deleteGroup(hObject,rowNum)
     delete(groupHandles{rowNum, 3});
     delete(groupHandles{rowNum, 4});
     delete(groupHandles{rowNum, 5});
+    delete(groupHandles{rowNum, 6});
     groupHandles(rowNum, :) = [];
     
     for i = rowNum:numRows
-        groupHandles{i, 5}.set('Callback',@(gObject,~) deleteGroup(gObject,i));
+        groupHandles{i, 6}.set('Callback',@(gObject,~) deleteGroup(gObject,i));
     end
     
-    handles.tra.group.grid.set('Widths',[-1 -1 -1 -1 -1]);
+    handles.tra.group.grid.set('Widths',[-1 -1 -1 -1 -1 -1]);
     handles.tra.group.grid.set('Heights',ones(1,numRows+1)*25);
     setappdata(handles.f,'trace_groupHandles',groupHandles);
     
@@ -855,7 +928,9 @@ function setCut(hObject)
     donorLimits = stretchlim(traces.Donor_raw(:,low:high));
     acceptorLimits = stretchlim(traces.Acceptor_raw(:,low:high));
     
-    if isempty(donorLimits) return; end
+    if isempty(donorLimits) 
+        return; 
+    end
     
     setappdata(handles.f,'donorLimits',donorLimits);
     setappdata(handles.f,'acceptorLimits',acceptorLimits);
