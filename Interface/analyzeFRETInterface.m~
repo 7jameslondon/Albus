@@ -199,18 +199,24 @@ function handles = createInterface(handles)
                                         'String', { 'Export Traces',...
                                                     'Export Images of Traces',...
                                                     'FRET Histogram',...
+                                                    'FRET HMM Histogram',...
                                                     'Transition Density',...
                                                     'Dwell Times',...
                                                     'Transition Count',...
                                                     'Post-sync'});
+    % exclude zero data                                            
+    handles.tra.export.excludeZeros = uicontrol('Parent', handles.tra.export.box,...
+                                                'String', 'Exclude zero data',...
+                                                'Style', 'checkbox');
+                                                
     % button box
     handles.tra.export.buttonBox = uix.HButtonBox( 'Parent', handles.tra.export.box,...
-                                                   'ButtonSize', [60 30]);
+                                                   'ButtonSize', [60 30],...
+                                                   'Spacing', 30);
     % display button
     handles.tra.export.dispaly = uicontrol( 'Parent', handles.tra.export.buttonBox,...
                                             'String', 'Display',...
                                             'Callback', @(hObject,~) displayAnalysis(hObject,guidata(hObject)));
-    uix.Empty('Parent', handles.tra.export.buttonBox);
     % export button
     handles.tra.export.export = uicontrol(  'Parent', handles.tra.export.buttonBox,...
                                             'String', 'Export',...
@@ -667,6 +673,13 @@ end
 
 function setGroupRule(hObject,rowNum)
     handles = guidata(hObject);
+    
+    % check if all traces have been calculated
+    traces = getappdata(handles.f,'traces');
+    if any(~traces.Calculated)
+        uiwait(msgbox('Pre-calculate traces first.'));
+        return;
+    end
 
     % promp user
     groupHandles = getappdata(handles.f,'trace_groupHandles');
@@ -1092,6 +1105,8 @@ function displayAnalysis(hObject,handles)
             uiwait(msgbox('Only for export.'));
         case 'FRET Histogram'
             displayFRETHistogram(hObject, handles);
+        case 'FRET HMM Histogram'
+            displayFRETHMMHistogram(hObject, handles);
         case 'Trasition Density'
             displayTDP(hObject, handles);
         case 'Dwell Times'
@@ -1116,6 +1131,10 @@ function exportAnalysis(hObject,handles)
             exportTraces(hObject,handles);
         case 'Export Images of Traces'
             exportTraceImages(hObject,handles);
+        case 'FRET Histogram'
+            exportFRETHistogram(hObject, handles);
+        case 'FRET HMM Histogram'
+            exportFRETHMMHistogram(hObject, handles);
         case 'Trasition Density'
             uiwait(msgbox('Only for display.'));
         case 'Dwell Times'
@@ -1127,7 +1146,8 @@ function exportAnalysis(hObject,handles)
     end
 end
 
-% Analysis
+%% Export Analysis
+% Trace
 function exportTraces(hObject,handles)
     % ask user where to save
     savePath = getappdata(handles.f,'savePath');
@@ -1153,6 +1173,7 @@ function exportTraces(hObject,handles)
     end
 end
 
+% Trace Images
 function exportTraceImages(hObject,handles)    
     % ask user where to save
     savePath = getappdata(handles.f,'savePath');
@@ -1193,7 +1214,83 @@ function exportTraceImages(hObject,handles)
     delete(hWaitBar);
 end
 
-function showDwellTime(hObject, handles)    
+% FRET Histograms
+function displayFRETHistogram(hObject, handles)
+    % get relevent data
+    traces = getappdata(handles.f,'traces');
+    shownTraceIdx = getShownTraces(hObject, handles);
+    traces = traces(shownTraceIdx,:);
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    x = (startT:endT);
+    
+    FRET = traces.FRET(:,x);
+    
+    if handles.tra.export.excludeZeros.Value
+        FRE = 
+    end
+    
+    figure;
+    histogram(FRET(:));
+end
+
+function exportFRETHistogram(hObject, handles)
+    % get relevent data
+    traces = getappdata(handles.f,'traces');
+    shownTraceIdx = getShownTraces(hObject, handles);
+    traces = traces(shownTraceIdx,:);
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    x = (startT:endT);
+    
+    FRET = traces.FRET(:,x);
+    
+    % ask user where to save
+    savePath = getappdata(handles.f,'savePath');
+    savePath = uigetdir(savePath);
+    
+    fileID = fopen([savePath,'/FRET_Histogram.dat'],'w'); % create file
+    fprintf(fileID,'%+30.30e\n',FRET(:)); % add header
+    fclose(fileID);
+end
+
+% FRET HMM Histogram
+function displayFRETHMMHistogram(hObject, handles)
+    % get relevent data
+    traces = getappdata(handles.f,'traces');
+    shownTraceIdx = getShownTraces(hObject, handles);
+    traces = traces(shownTraceIdx,:);
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    x = (startT:endT);
+    
+    FRET_hmm = traces.FRET_hmm(:,x);
+    figure;
+    histogram(FRET_hmm(:));
+end
+
+function exportFRETHMMHistogram(hObject, handles)
+    % get relevent data
+    traces = getappdata(handles.f,'traces');
+    shownTraceIdx = getShownTraces(hObject, handles);
+    traces = traces(shownTraceIdx,:);
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    x = (startT:endT);
+    
+    FRET_hmm = traces.FRET_hmm(:,x);
+    
+    % ask user where to save
+    savePath = getappdata(handles.f,'savePath');
+    savePath = uigetdir(savePath);
+    
+    fileID = fopen([savePath,'/FRET_HMM_Histogram.dat'],'w'); % create file
+    fprintf(fileID,'%+30.30e\n',FRET_hmm(:)); % add header
+    fclose(fileID);
+end
+
+% Dwell Times
+function displayDwellTime(hObject, handles)    
     % get relevent data
     traces = getappdata(handles.f,'traces');
     shownTraceIdx = getShownTraces(hObject, handles);
@@ -1224,6 +1321,7 @@ function showDwellTime(hObject, handles)
     histogram(ax3, fretData(:), binSize);
 end
 
+% Transition counts
 function exportTransCounts(hObject, handles)
     % ask user where to save
     savePath = getappdata(handles.f,'savePath');
@@ -1252,7 +1350,8 @@ function exportTransCounts(hObject, handles)
     fclose(fileID); % close
 end
 
-function showTDP(hObject, handles)
+% Transition density
+function displayTDP(hObject, handles)
     %% Setups
     % get all the trace data
     traces = getappdata(handles.f,'traces');
@@ -1303,7 +1402,8 @@ function showTDP(hObject, handles)
     shading interp;
 end
 
-function showPSH(hObject, handles)
+% Post sync
+function displayPSH(hObject, handles)
     %% Setups
     % get all the trace data
     traces = getappdata(handles.f,'traces');

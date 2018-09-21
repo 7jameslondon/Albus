@@ -198,12 +198,16 @@ function handles = createInterface(handles)
                                         'Style', 'popupmenu',...
                                         'String', { 'Export Traces',...
                                                     'Export Images of Traces',...
-                                                    'FRET Histogram',...
-                                                    'FRET HMM Histogram',...
+                                                    'Histograms',...
+                                                    'HMM Histograms',...
                                                     'Transition Density',...
-                                                    'Dwell Times',...
                                                     'Transition Count',...
                                                     'Post-sync'});
+    % exclude zero data                                            
+    handles.tra.export.excludeZeros = uicontrol('Parent', handles.tra.export.box,...
+                                                'String', 'Exclude zero data',...
+                                                'Style', 'checkbox');
+                                                
     % button box
     handles.tra.export.buttonBox = uix.HButtonBox( 'Parent', handles.tra.export.box,...
                                                    'ButtonSize', [60 30],...
@@ -693,6 +697,8 @@ function setGroupRule(hObject,rowNum)
     results = eval(rule);
     traces.Groups(:,rowNum) = results;
     setappdata(handles.f,'traces',traces);
+    c = getappdata(handles.f,'trace_currentTrace');
+    groupHandles{rowNum,4}.set('Value',results(c));
     saveTraceGroups(hObject,handles);
     updateDisplay(hObject,handles);
 end
@@ -728,15 +734,19 @@ end
 
 function shownTraceIdx = getShownTraces(hObject, handles)
     traces = getappdata(handles.f,'traces');
-    groupHandles = getappdata(handles.f,'trace_groupHandles');
-    numGroups = size(groupHandles,1);
-    
-    shownGroups = zeros(numGroups,1,'logical'); % pre-aloc
-    for i = 1:numGroups
-        shownGroups(i) = logical(groupHandles{i,1}.get('Value'));
+    if handles.tra.skipHiddenGroups.Value
+        groupHandles = getappdata(handles.f,'trace_groupHandles');
+        numGroups = size(groupHandles,1);
+
+        shownGroups = zeros(numGroups,1,'logical'); % pre-aloc
+        for i = 1:numGroups
+            shownGroups(i) = logical(groupHandles{i,1}.get('Value'));
+        end
+
+        shownTraceIdx = any(traces.Groups(:,shownGroups),2);
+    else
+        shownTraceIdx = ones(1,size(traces,1),'logical');
     end
-    
-    shownTraceIdx = any(traces.Groups(:,shownGroups),2);
 end
 
 %% Selected Trace
@@ -753,6 +763,33 @@ function prevTrace(hObject,handles)
         c=1;
     end
     setTrace(hObject,handles,c);
+    
+    % if skiping hidden groups check for prev group
+    if handles.tra.skipHiddenGroups.Value
+        shownTraceIdx = getShownTraces(hObject, handles);
+
+        if ~shownTraceIdx(c) % Is this traces hidden?
+            % Then goto next trace shown trace                
+
+            if ~any(shownTraceIdx) % Are all the traces currently hidden?
+                handles.tra.skipHiddenGroups.Value = 0;
+                uiwait(msgbox('All traces hidden'));
+            else
+                % Find the prev traces that is prev in order
+                allShownTraces = find(shownTraceIdx);
+                if any(allShownTraces<c)
+                    shownTrace = allShownTraces(allShownTraces<c);
+                    nextTrace = shownTrace(end);
+                else
+                    nextTrace = allShownTraces(end);
+                end
+                setTrace(hObject,handles,nextTrace);
+                updateDisplay(hObject,handles);
+            end
+            return;
+        end
+    end
+    
     updateDisplay(hObject,handles);
 end
 
@@ -1093,19 +1130,19 @@ function displayAnalysis(hObject,handles)
         return;
     end
     
+    exportFlag = false;
+    
     switch handles.tra.export.menu.String{handles.tra.export.menu.Value}
         case 'Export Traces'
             uiwait(msgbox('Only for export.'));
         case 'Export Images of Traces'
             uiwait(msgbox('Only for export.'));
-        case 'FRET Histogram'
-            displayFRETHistogram(hObject, handles);
-        case 'FRET HMM Histogram'
-            displayFRETHMMHistogram(hObject, handles);
+        case 'Histograms'
+            analysisHistograms(hObject, handles, exportFlag, false);
+        case 'HMM Histograms'
+            analysisHistograms(hObject, handles, exportFlag, true);
         case 'Trasition Density'
             displayTDP(hObject, handles);
-        case 'Dwell Times'
-            displayDwellTime(hObject, handles);
         case 'Transition Count'
             uiwait(msgbox('Only for export.'));
         case 'Post-sync'
@@ -1121,18 +1158,18 @@ function exportAnalysis(hObject,handles)
         return;
     end
     
+    exportFlag = true;
+    
     switch handles.tra.export.menu.String{handles.tra.export.menu.Value}
         case 'Export Traces'
             exportTraces(hObject,handles);
         case 'Export Images of Traces'
             exportTraceImages(hObject,handles);
-        case 'FRET Histogram'
-            exportFRETHistogram(hObject, handles);
-        case 'FRET HMM Histogram'
-            exportFRETHMMHistogram(hObject, handles);
+        case 'Histograms'
+            analysisHistograms(hObject, handles, exportFlag, false);
+        case 'HMM Histograms'
+            analysisHistograms(hObject, handles, exportFlag, true);
         case 'Trasition Density'
-            uiwait(msgbox('Only for display.'));
-        case 'Dwell Times'
             uiwait(msgbox('Only for display.'));
         case 'Transition Count'
             exportTransCounts(hObject, handles);
@@ -1141,7 +1178,8 @@ function exportAnalysis(hObject,handles)
     end
 end
 
-% Analysis
+%% Export Analysis
+% Trace
 function exportTraces(hObject,handles)
     % ask user where to save
     savePath = getappdata(handles.f,'savePath');
@@ -1167,6 +1205,7 @@ function exportTraces(hObject,handles)
     end
 end
 
+% Trace Images
 function exportTraceImages(hObject,handles)    
     % ask user where to save
     savePath = getappdata(handles.f,'savePath');
@@ -1207,7 +1246,8 @@ function exportTraceImages(hObject,handles)
     delete(hWaitBar);
 end
 
-function displayFRETHistogram(hObject, handles)
+% Histograms
+function analysisHistograms(hObject, handles, exportFlag, hmmFlag)    
     % get relevent data
     traces = getappdata(handles.f,'traces');
     shownTraceIdx = getShownTraces(hObject, handles);
@@ -1216,96 +1256,66 @@ function displayFRETHistogram(hObject, handles)
     endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
     x = (startT:endT);
     
-    FRET = traces.FRET(:,x);
-    figure;
-    histogram(FRET(:));
+    % select the data
+    if hmmFlag
+        donorData = traces.Donor_hmm(:,x);
+        acceptorData = traces.Acceptor_hmm(:,x);
+        fretData = traces.FRET_hmm(:,x);
+    else
+        donorData = traces.Donor(:,x);
+        acceptorData = traces.Acceptor(:,x);
+        fretData = traces.FRET(:,x);
+    end
+    
+    if handles.tra.export.excludeZeros.Value
+        donorExclude = traces.Donor_hmm(:,x) > 0.0;
+        acceptorExclude = traces.Acceptor_hmm(:,x) > 0.0;
+        fretExclude = traces.FRET_hmm(:,x) > .05;
+        
+        donorData = donorData(donorExclude);
+        acceptorData = acceptorData(acceptorExclude);
+        fretData = fretData(fretExclude);
+    end
+    
+    if exportFlag
+        % ask user where to save
+        savePath = getappdata(handles.f,'savePath');
+        savePath = uigetdir(savePath);
+        
+        % donor
+        fileID = fopen([savePath,'/Donor_for_histogram.dat'],'w'); % create file
+        fprintf(fileID,'%30e30\n',donorData(:)); 
+        fclose(fileID);
+        % acceptor
+        fileID = fopen([savePath,'/Acceptor_for_histogram.dat'],'w'); % create file
+        fprintf(fileID,'%30e30\n',acceptorData(:)); 
+        fclose(fileID);
+        % fret
+        fileID = fopen([savePath,'/FRET_for_histogram.dat'],'w'); % create file
+        fprintf(fileID,'%30e30\n',fretData(:)); 
+        fclose(fileID);
+    else
+        % plot the 3 dwell times
+        f = figure;
+        ax = axes(f);
+        
+        nBins = 200;
+        
+        ax1 = subplot(1, 3, 1, ax); % left
+        title(ax1, "Donor");
+        histogram(ax1, donorData(:), nBins);
+
+        ax2 = subplot(1, 3, 2); % middle
+        title(ax2, "Acceptor");
+        histogram(ax2, acceptorData(:), nBins);
+
+        ax3 = subplot(1, 3, 3); % right
+        title(ax3, "FRET");
+        histogram(ax3, fretData(:), nBins, 'BinLimits', [-.1 1.1]);
+    end
 end
 
-function exportFRETHistogram(hObject, handles)
-    % get relevent data
-    traces = getappdata(handles.f,'traces');
-    shownTraceIdx = getShownTraces(hObject, handles);
-    traces = traces(shownTraceIdx,:);
-    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
-    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
-    x = (startT:endT);
-    
-    FRET = traces.FRET(:,x);
-    
-    % ask user where to save
-    savePath = getappdata(handles.f,'savePath');
-    savePath = uigetdir(savePath);
-    
-    fileID = fopen([savePath,'/FRET_Histogram.dat'],'w'); % create file
-    fprintf(fileID,'%+30.30e\n',FRET(:)); % add header
-    fclose(fileID);
-end
-
-function displayFRETHMMHistogram(hObject, handles)
-    % get relevent data
-    traces = getappdata(handles.f,'traces');
-    shownTraceIdx = getShownTraces(hObject, handles);
-    traces = traces(shownTraceIdx,:);
-    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
-    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
-    x = (startT:endT);
-    
-    FRET_hmm = traces.FRET_hmm(:,x);
-    figure;
-    histogram(FRET_hmm(:));
-end
-
-function exportFRETHMMHistogram(hObject, handles)
-    % get relevent data
-    traces = getappdata(handles.f,'traces');
-    shownTraceIdx = getShownTraces(hObject, handles);
-    traces = traces(shownTraceIdx,:);
-    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
-    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
-    x = (startT:endT);
-    
-    FRET_hmm = traces.FRET_hmm(:,x);
-    
-    % ask user where to save
-    savePath = getappdata(handles.f,'savePath');
-    savePath = uigetdir(savePath);
-    
-    fileID = fopen([savePath,'/FRET_HMM_Histogram.dat'],'w'); % create file
-    fprintf(fileID,'%+30.30e\n',FRET_hmm(:)); % add header
-    fclose(fileID);
-end
-
-function displayDwellTime(hObject, handles)    
-    % get relevent data
-    traces = getappdata(handles.f,'traces');
-    shownTraceIdx = getShownTraces(hObject, handles);
-    traces = traces(shownTraceIdx,:);
-    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
-    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
-    x = (startT:endT);
-    
-    % set up a seperate figure
-    f = figure;
-    ax = axes(f);
-    
-    % plot the 3 dwell times
-    binSize = 200;
-    ax1 = subplot(1, 3, 1, ax); % left
-    title(ax1, "Donor");
-    donorData = traces.Donor(:,x);
-    histogram(ax1, donorData(:), binSize);
-    
-    ax2 = subplot(1, 3, 2); % middle
-    title(ax2, "Acceptor");
-    acceptorData = traces.Acceptor(:,x);
-    histogram(ax2, acceptorData(:), binSize);
-    
-    ax3 = subplot(1, 3, 3); % right
-    title(ax3, "FRET");
-    fretData = traces.FRET(:,x);
-    histogram(ax3, fretData(:), binSize);
-end
-
+% Transition counts
 function exportTransCounts(hObject, handles)
     % ask user where to save
     savePath = getappdata(handles.f,'savePath');
@@ -1334,6 +1344,7 @@ function exportTransCounts(hObject, handles)
     fclose(fileID); % close
 end
 
+% Transition density
 function displayTDP(hObject, handles)
     %% Setups
     % get all the trace data
@@ -1385,6 +1396,7 @@ function displayTDP(hObject, handles)
     shading interp;
 end
 
+% Post sync
 function displayPSH(hObject, handles)
     %% Setups
     % get all the trace data
@@ -1397,6 +1409,11 @@ function displayPSH(hObject, handles)
     
     %% Calculation
     fret  = traces.FRET_hmm(:,T); % grab all the FRET traces in one matrix
+    fret = fret(:);
+    if handles.tra.export.excludeZeros.Value
+        fret = fret(fret~=0);
+    end
+    
     times = repmat(1:length(T),size(fret,1),1);
     [N, X, Y] = histcounts2(times(:),fret(:),1:3:length(T), 0:.05:1);
     X = movmean(X,2,'Endpoints','discard'); % convert endpoints to centers
