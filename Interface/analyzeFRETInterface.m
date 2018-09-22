@@ -286,7 +286,9 @@ function handles = createInterface(handles)
     
     handles.tra.DAScaleAuto = uicontrol('Parent', handles.tra.DAScaleBox,...
                                         'String', '',...
-                                        'Style', 'Checkbox');
+                                        'Style', 'Checkbox',...
+                                        'Value', 1,...
+                                        'Callback', @(hObject,~) updateDisplay(hObject,guidata(hObject)) );
     
     [~, handles.tra.DAScale] = javacomponent('com.jidesoft.swing.RangeSlider');
     handles.tra.DAScale.set('Parent', handles.tra.DAScaleBox);
@@ -347,6 +349,7 @@ function handles = loadFromSession(hObject,handles,session)
     
 	setappdata(handles.f,'traces', session.tra_traces);
     
+    % Are all the traces calculated 
     if isempty(session.tra_traces) || any(~session.tra_traces.Calculated)
         handles.tra.preCalButton.Enable = 'on';
     else
@@ -357,11 +360,21 @@ function handles = loadFromSession(hObject,handles,session)
     setappdata(handles.f,'trace_currentTrace', session.tra_currentTrace);
     set(handles.tra.currentDNATextBox, 'String', num2str(session.tra_currentTrace));
     
+    % Cutting
+    if getappdata(handles.f,'isMapped')
+        seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
+        vidMax = size(seperatedStacks{1},3);
+    else
+        seperatedStacks = getappdata(handles.f,'data_video_stack');
+        vidMax = size(seperatedStacks,3);
+    end
+    handles.tra.cutSlider.JavaPeer.set('Maximum', vidMax);
     set(handles.tra.cutSlider.JavaPeer, 'LowValue', session.tra_lowCut);
     set(handles.tra.cutSlider.JavaPeer, 'HighValue', session.tra_highCut);
     set(handles.tra.meanSlider.JavaPeer, 'Value', session.tra_mean);
     set(handles.tra.highCutTextBox, 'String', num2str(session.tra_highCut));
     set(handles.tra.lowCutTextBox, 'String', num2str(session.tra_lowCut));
+    
     set(handles.tra.meanTextBox, 'String', num2str(session.tra_mean));
    
     set(handles.tra.hmmStatesSlider.JavaPeer, 'LowValue', session.tra_lowStates);
@@ -403,8 +416,13 @@ end
 function onDisplay(hObject,handles,loadingSession)
     setappdata(handles.f,'mode','Traces');
     
-    % 
-    handles.tra.preCalButton.Enable = 'on';
+    % Are all the traces calculated 
+    traces = getappdata(handles.f,'traces');
+    if ~isfield(traces,'Calculated') || any(~traces.Calculated)
+        handles.tra.preCalButton.Enable = 'on';
+    else
+        handles.tra.preCalButton.Enable = 'off';
+    end
     
     % turn off skiping cause groups are not set up
     handles.tra.skipHiddenGroups.Value = 0;
@@ -423,12 +441,13 @@ function onDisplay(hObject,handles,loadingSession)
     % set sliders
     set(handles.tra.vidCurrentFrame.JavaPeer,'Maximum', vidMax);
     set(handles.tra.vidCurrentFrame.JavaPeer,'Value', getappdata(handles.f,'home_currentFrame'));
-    handles.tra.cutSlider.JavaPeer.set('Maximum', vidMax);
-    handles.tra.cutSlider.JavaPeer.set('HighValue', vidMax);
-    handles.tra.cutSlider.JavaPeer.set('LowValue', 1);
-    handles.tra.highCutTextBox.String = num2str(vidMax);
-    handles.tra.lowCutTextBox.String = num2str(1);
-    set(handles.tra.vidHBox,'Visible','on');
+    if ~exist('loadingSession','var') || ~loadingSession
+        handles.tra.cutSlider.JavaPeer.set('Maximum', vidMax);
+        handles.tra.cutSlider.JavaPeer.set('HighValue', vidMax);
+        handles.tra.cutSlider.JavaPeer.set('LowValue', 1);
+        handles.tra.highCutTextBox.String = num2str(vidMax);
+        handles.tra.lowCutTextBox.String = num2str(1);
+    end
     
     % updates
     if ~exist('loadingSession','var') || ~loadingSession
@@ -436,6 +455,7 @@ function onDisplay(hObject,handles,loadingSession)
     end
     updateMaxTraces(hObject, handles);
     setTrace(hObject,handles,1);
+    setCut(hObject);
     setVidCurrentFrame(hObject, getappdata(handles.f,'home_currentFrame'));
     setScale(hObject, ...
         handles.tra.DAScale.JavaPeer.get('LowValue') / ...

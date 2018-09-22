@@ -319,10 +319,8 @@ function handles = loadFromSession(hObject,handles,session)
     % overlay
     if strcmp(session.map_mode,'Overlay')
         collocalizeMapping(hObject, guidata(hObject));
-        switchMode(hObject, handles, 'Overlay');
-    else
-        switchMode(hObject, guidata(hObject), session.map_mode);
     end
+    switchMode(hObject, guidata(hObject), session.map_mode);
     
     guidata(hObject,handles);
 end
@@ -706,6 +704,10 @@ end
 function updateDisplay(hObject,handles,particleFlag) 
     if ~exist('handles','var')
         handles = guidata(hObject);
+    end
+    
+    if ~strcmp(getappdata(handles.f,'mode'),'Mapping')
+        return;
     end
     
     % get values

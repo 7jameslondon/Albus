@@ -49,6 +49,9 @@ function flag = loadSession(hObject)
         
         session.kym_syncBrightness = 0;
     end
+    if ~isfield(session,'tra_DAScaleAuto')
+        session.tra_DAScaleAuto = 1;
+    end
     
     
     %% Setup general variables
