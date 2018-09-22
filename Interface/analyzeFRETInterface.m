@@ -403,6 +403,14 @@ end
 function onDisplay(hObject,handles,loadingSession)
     setappdata(handles.f,'mode','Traces');
     
+    % 
+    handles.tra.preCalButton.Enable = 'on';
+    
+    % turn off skiping cause groups are not set up
+    handles.tra.skipHiddenGroups.Value = 0;
+    delete(handles.tra.group.grid.Children(7:size(handles.tra.group.grid.Children,1)));
+    setappdata(handles.f,'trace_groupHandles',cell(0,6));
+    
     % get stack
     if getappdata(handles.f,'isMapped')
         seperatedStacks = getappdata(handles.f,'data_video_seperatedStacks');
@@ -453,6 +461,11 @@ function onRelease(hObject,handles)
     
     % key presses, these get turned on by onDisplay
     set(handles.f,'WindowKeyPressFcn','');
+    
+    % remove groups
+    handles.tra.skipHiddenGroups.Value = 0;
+    delete(handles.tra.group.grid.Children(7:size(handles.tra.group.grid.Children,1)));
+    setappdata(handles.f,'trace_groupHandles',cell(0,6));
     
     homeInterface('openSelectFRET',hObject);
 end
@@ -899,15 +912,15 @@ function preCalculateAllTraces(hObject, handles)
     
     % run calcualtions
     uncalculatedTraces = ~traces.Calculated;
-    parfor_progress(numTraces);
+    parWaitbar('start', 'Calculating parameters for traces', numTraces);
     parfor c=1:numTraces
         if uncalculatedTraces(c)
             traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2), removeBG);
         end
         
-        parfor_progress;
+        parWaitbar;
     end
-	parfor_progress(0);
+	parWaitbar('end');
         
     
     % save
@@ -1141,7 +1154,7 @@ function displayAnalysis(hObject,handles)
             analysisHistograms(hObject, handles, exportFlag, false);
         case 'HMM Histograms'
             analysisHistograms(hObject, handles, exportFlag, true);
-        case 'Trasition Density'
+        case 'Transition Density'
             displayTDP(hObject, handles);
         case 'Transition Count'
             uiwait(msgbox('Only for export.'));
@@ -1169,7 +1182,7 @@ function exportAnalysis(hObject,handles)
             analysisHistograms(hObject, handles, exportFlag, false);
         case 'HMM Histograms'
             analysisHistograms(hObject, handles, exportFlag, true);
-        case 'Trasition Density'
+        case 'Transition Density'
             uiwait(msgbox('Only for display.'));
         case 'Transition Count'
             exportTransCounts(hObject, handles);
@@ -1374,6 +1387,7 @@ function displayTDP(hObject, handles)
     goodDiffs = diffrences(goodLocs,:); 
     fret      = fret(goodLocs,:);
 
+    parWaitbar('start', 'Generating TDP', size(goodDiffs,1));
     TDPArray = zeros(size(goodDiffs,1),gridSpacing,gridSpacing); % pre-aloc
     parfor i=1:size(goodDiffs,1)
         loc = find(goodDiffs(i,:));
@@ -1385,6 +1399,8 @@ function displayTDP(hObject, handles)
              TDP = TDP + gauss2d(start(j),stop(j));
         end
         TDPArray(i,:,:) = TDP;
+        
+        parWaitbar;
     end
     
     TDP = shiftdim(sum(TDPArray,1));
@@ -1394,6 +1410,9 @@ function displayTDP(hObject, handles)
     xlabel('FRET Before Transision');
     ylabel('FRET After Transision');
     shading interp;
+    view(0,90); % birds-eye
+    
+    parWaitbar('end');
 end
 
 % Post sync

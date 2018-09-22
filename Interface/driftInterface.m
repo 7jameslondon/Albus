@@ -168,7 +168,6 @@ function handles = createInterface(handles)
                                             
     handles.drift.driftVectorAxes = polaraxes(handles.drift.applyCorrectionVBox);
     polarplot(handles.drift.driftVectorAxes,0,0);
-    handles.drift.driftVectorAxes.RTickLabel = [];
     handles.drift.driftVectorAxes.ThetaTickLabel = [];
     
     uix.Empty('Parent', handles.drift.applyCorrectionVBox);
@@ -231,7 +230,7 @@ function onDisplay(hObject,handles)
     set(handles.axesControl.currentFrame.JavaPeer,'Maximum', stackLength);
     set(handles.axesControl.currentFrame.JavaPeer,'Value', getappdata(handles.f,'home_currentFrame'));
     set(handles.axesControl.currentFrameTextbox,'String', num2str(getappdata(handles.f,'home_currentFrame')));
-    handles.axesControl.currentFrame.JavaPeer.set('StateChangedCallback', ...
+    handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', ...
         @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
     handles.axesControl.currentFrameTextbox.set('Callback', @(hObject,~) setCurrentFrame( hObject, str2num(hObject.String)));
     handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
@@ -317,6 +316,16 @@ function updateDisplay(hObject,handles)
         plt = [];
         setappdata(handles.f,'data_drift_plt',plt);
     end
+    
+    % plot the current drift vector
+    drift = getappdata(handles.f,'drift');
+    if isempty(drift)
+        polarplot(handles.drift.driftVectorAxes,[]);
+    else
+        [driftTheta, driftR] = cart2pol(drift(:,1),drift(:,2));
+        polarplot(handles.drift.driftVectorAxes, driftTheta, driftR);
+    end
+    handles.drift.driftVectorAxes.ThetaTickLabel = [];
 end
 
 function I = getCurrentImage(hObject,handles,brightnessflag)
@@ -538,7 +547,7 @@ function applyCorrection(hObject, handles, value)
         waitbar(0.5,hWaitBar,'Correcting Drift ...');
         
         if getappdata(handles.f,'isMapped')
-            mappingInterface('collocalizeVideo',hObject,handles);
+            collocalizeVideo(hObject,handles);
         else
             videoSettingInterface('postProcessVideo',hObject,handles);
         end
@@ -552,7 +561,7 @@ function applyCorrection(hObject, handles, value)
         setappdata(handles.f,'drift',[]);
         
         if getappdata(handles.f,'isMapped')
-            mappingInterface('collocalizeVideo',hObject,handles);
+            collocalizeVideo(hObject,handles);
         else
             videoSettingInterface('postProcessVideo',hObject,handles);
         end
@@ -560,7 +569,6 @@ function applyCorrection(hObject, handles, value)
         polarplot(handles.drift.driftVectorAxes,0,0);
     end
     
-    handles.drift.driftVectorAxes.RTickLabel = [];
     handles.drift.driftVectorAxes.ThetaTickLabel = [];
 end
 

@@ -442,6 +442,8 @@ function onRelease(hObject,handles)
     if ~isempty(plt)
         delete(plt);
     end
+    plt = [];
+    setappdata(handles.f,'data_fret_plt',plt);
     
     homeInterface('openHome',hObject);
 end

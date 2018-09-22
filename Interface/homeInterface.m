@@ -215,6 +215,7 @@ function onDisplay(hObject,handles)
         set(handles.axesControl.currentFrame.JavaPeer,'Value', getappdata(handles.f,'home_currentFrame'));
         set(handles.axesControl.currentFrameTextbox,'String', num2str(getappdata(handles.f,'home_currentFrame')));
         handles.axesControl.currentFrame.JavaPeer.set('StateChangedCallback', @(~,~) setCurrentFrame(handles.axesControl.currentFrame, get(handles.axesControl.currentFrame.JavaPeer,'Value')));
+        handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', []);
         handles.axesControl.currentFrameTextbox.set('Callback', @(hObject,~) setCurrentFrame( hObject, str2num(hObject.String)));
         % play button
         handles.axesControl.playButton.set('Callback', @(hObject,~) playVideo( hObject, guidata(hObject)));
@@ -233,6 +234,9 @@ function onRelease(hObject,handles)
     end
     
     setappdata(handles.f,'home_currentFrame', get(handles.axesControl.currentFrame.JavaPeer,'Value'));
+    
+    handles.axesControl.currentFrame.JavaPeer.set('StateChangedCallback', []);
+    handles.axesControl.currentFrame.JavaPeer.set('MouseReleasedCallback', []);
 end
 
 function switchDisplayAxes(hObject, value)

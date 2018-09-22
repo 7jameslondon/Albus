@@ -17,9 +17,7 @@ function main
     addpath([mpath '/vbfret']);
     addpath([mpath '/vbfret/src']);
     addpath([mpath '/vbfret/ext_src']);
-    
-    addpath([mpath '/parfor_progress']);
-    
+        
     addpath([mpath '/GUI_Layout_Toolbox_2/layout/']);
 
     %% Interface
