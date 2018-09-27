@@ -149,7 +149,7 @@ function handles = createInterface(handles)
     % filter
     uicontrol( 'Parent', handles.map.particleVBox,...
                'Style' , 'text', ...
-               'String', 'Gaussina Filter Size');
+               'String', 'Gaussian Filter Size');
     [~, handles.map.particleFilter] = javacomponent('javax.swing.JSlider');
     handles.map.particleFilter.set('Parent', handles.map.particleVBox);
     handles.map.particleFilter.JavaPeer.set('Maximum', 5e5);
