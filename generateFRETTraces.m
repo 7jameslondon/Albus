@@ -36,17 +36,15 @@ function generateFRETTraces(hObject, handles)
                                 'MinDistance', particleMinDistance);
     traces = particles{1};    
     
+    traces.HalfWidth = 2.5 * ones(size(traces.HalfWidth));
+    
     %% Calculate the donor and acceptor raw traces
     numTraces = size(traces,1);
     Donor_raw = zeros(numTraces,dur); % pre-aloc;
     Acceptor_raw = zeros(numTraces,dur); % pre-aloc;
     for f=1:dur % no parfor becuase seperatedStacks is too big :(
         waitbar(f/dur);
-        
-        
-        width = min(traces.HalfWidth,5);
-        traces.HalfWidth = width;
-        
+                
         if numStacks == 2
             I_donor    = im2double(seperatedStacks{1}(:,:,f));
             I_acceptor = im2double(seperatedStacks{2}(:,:,f));
@@ -56,18 +54,19 @@ function generateFRETTraces(hObject, handles)
             F_acceptor = griddedInterpolant(I_acceptor);
             
             % create 7 by 7 area mask
-            F_del = ( repmat((-1:1/3:1),numTraces,1) .* repmat(width*2, 1, 7) );
+            F_del = repmat((-1:1/3:1),numTraces,1) .* repmat(traces.HalfWidth*2, 1, 7);
             F_x = reshape( repmat( repmat(traces.Center(:,2), 1, 7) + F_del , 1, 7) ,[],1);
             F_y = reshape( imresize( repmat(traces.Center(:,1), 1, 7) + F_del, [numTraces 49], 'nearest') ,[],1);
 
             W = (1:49);
             W = (mod(W,7)-1-3).^2 + (floor(W/7)-3).^2;
             W = repmat(W,numTraces,1);
-            W = W ./ repmat( 2*(width.^2) ,1,49);
+            W = W ./ repmat( 2*(traces.HalfWidth.^2) ,1,49);
             W = exp(-W);
 
             Donor_raw(:,f)      = mean((reshape( F_donor(F_x,F_y), [], 49 ) ) .* W ,2);
             Acceptor_raw(:,f)  	= mean((reshape( F_acceptor(F_x,F_y), [], 49 ) ) .* W ,2);
+            
         elseif numStacks == 1
             I_donor    = im2double(seperatedStacks(:,:,f));
 
@@ -75,14 +74,14 @@ function generateFRETTraces(hObject, handles)
             F_donor    = griddedInterpolant(I_donor);
 
             % create 7 by 7 area mask
-            F_del = ( repmat((-1:1/3:1),numTraces,1) .* repmat(width*2, 1, 7) );
+            F_del = ( repmat((-1:1/3:1),numTraces,1) .* repmat(traces.HalfWidth*2, 1, 7) );
             F_x = reshape( repmat( repmat(traces.Center(:,2), 1, 7) + F_del , 1, 7) ,[],1);
             F_y = reshape( imresize( repmat(traces.Center(:,1), 1, 7) + F_del, [numTraces 49], 'nearest') ,[],1);
 
             W = (1:49);
             W = (mod(W,7)-1-3).^2 + (floor(W/7)-3).^2;
             W = repmat(W,numTraces,1);
-            W = W ./ repmat( 2*(width.^2) ,1,49);
+            W = W ./ repmat( 2*(traces.HalfWidth.^2) ,1,49);
             W = exp(-W);
 
             Donor_raw(:,f)      = mean((reshape( F_donor(F_x,F_y), [], 49 ) ) .* W ,2);
@@ -116,4 +115,3 @@ function generateFRETTraces(hObject, handles)
     setappdata(handles.f,'acceptorLimits',acceptorLimits);
     
     delete(hWaitBar);
-end

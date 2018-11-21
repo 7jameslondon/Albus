@@ -149,7 +149,8 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             session.tra_DAScaleAuto     = handles.tra.DAScaleAuto.Value;
             session.tra_DAScale         = [get(handles.tra.DAScale.JavaPeer, 'LowValue'), get(handles.tra.DAScale.JavaPeer, 'HighValue')];
             
-            session.tra_removeBG        = handles.tra.removeBGCheckbox.Value;
+            session.tra_donorBGRule     = getappdata(handles.f,'trace_donorBGRule');
+            session.tra_acceptorBGRule  = getappdata(handles.f,'trace_acceptorBGRule');
             
             groupHandles = getappdata(handles.f,'trace_groupHandles');
             tra_groups = cell(size(groupHandles,1),3);
@@ -157,6 +158,7 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
                 tra_groups{i,1} = groupHandles{i,1}.get('Value');
                 tra_groups{i,2} = groupHandles{i,2}.get('String');
                 tra_groups{i,3} = groupHandles{i,3}.get('String');
+                tra_groups{i,5} = groupHandles{i,5}.get('UserData');
             end
             session.tra_groups = tra_groups;
             

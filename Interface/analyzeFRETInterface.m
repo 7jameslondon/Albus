@@ -14,6 +14,8 @@ function handles = createInterface(handles)
     setappdata(handles.f,'traces',traces);
     setappdata(handles.f,'trace_currentTrace',1);
     setappdata(handles.f,'trace_mode','default');
+    setappdata(handles.f,'trace_donorBGRule','');
+    setappdata(handles.f,'trace_acceptorBGRule','');
     
     handles.tra.leftPanel = uix.VBox( 'Parent', handles.leftPanel);
     
@@ -74,10 +76,9 @@ function handles = createInterface(handles)
     handles.tra.meanBox.set('Widths',[30, -1]);
     
     % remove background
-    handles.tra.removeBGCheckbox = uicontrol(   'Parent', handles.tra.settingsBox,...
-                                                'String', 'Remove Background',...
-                                                'Style', 'checkbox',...
-                                                'Callback', @(hObject,~) setRemoveBG(hObject));
+    handles.tra.setBGRuleButton = uicontrol(   'Parent', handles.tra.settingsBox,...
+                                                'String', 'Set Background Rule',...
+                                                'Callback', @(hObject,~) setBGRule(hObject,guidata(hObject)));
                                             
     handles.tra.settingsBox.set('Heights',[25,20,20,20,20,20]);
                                     
@@ -202,7 +203,9 @@ function handles = createInterface(handles)
                                                     'HMM Histograms',...
                                                     'Transition Density',...
                                                     'Transition Count',...
-                                                    'Post-sync'});
+                                                    'Post-sync',...
+                                                    'Dwell Times',...
+                                                    'Correlation'});
     % exclude zero data                                            
     handles.tra.export.excludeZeros = uicontrol('Parent', handles.tra.export.box,...
                                                 'String', 'Exclude zero data',...
@@ -321,10 +324,10 @@ function handles = createInterface(handles)
     handles.tra.DonorStatePlot.LineWidth    = 2;
     handles.tra.AcceptorStatePlot.LineWidth = 2;
     
-    handles.tra.DonorPlot.Color         = [38.8, 58.4, 00.0]/100;
-    handles.tra.AcceptorPlot.Color      = [85.5, 13.7, 13.7]/100;
-    handles.tra.DonorStatePlot.Color    = [58.8, 88.4, 30.0]/100;
-    handles.tra.AcceptorStatePlot.Color = [100., 13.7, 40.0]/100;
+    handles.tra.DonorPlot.Color         = [10, 50, 0]/100;
+    handles.tra.AcceptorPlot.Color      = [75, 15, 0]/100;
+    handles.tra.DonorStatePlot.Color    = [50, 100, 30]/100;
+    handles.tra.AcceptorStatePlot.Color = [100, 50, 70]/100;
 
     % fret
     handles.tra.FRETPlot        = plot(handles.tra.FRETAxes, 1, '-');
@@ -381,14 +384,16 @@ function handles = loadFromSession(hObject,handles,session)
     set(handles.tra.hmmStatesSlider.JavaPeer, 'HighValue', session.tra_highStates);
     set(handles.tra.hmmStatesLowTextBox, 'String', num2str(session.tra_lowStates));
     set(handles.tra.hmmStatesHighTextBox, 'String', num2str(session.tra_highStates));
-    
-    handles.tra.removeBGCheckbox.Value = session.tra_removeBG;
-    
+        
     handles.tra.DAScaleAuto.Value = session.tra_DAScaleAuto;
     set(handles.tra.DAScale.JavaPeer, 'LowValue', session.tra_DAScale(1));
     set(handles.tra.DAScale.JavaPeer, 'HighValue', session.tra_DAScale(2));
     
     handles.tra.playSpeed.String = num2str(session.playSpeed);
+    
+    % background
+    setappdata(handles.f,'trace_donorBGRule',session.tra_donorBGRule);
+    setappdata(handles.f,'trace_acceptorBGRule',session.tra_acceptorBGRule);
     
     %% groups
     % remove old groups
@@ -404,6 +409,7 @@ function handles = loadFromSession(hObject,handles,session)
         groupHandles{i,1}.set('Value', session.tra_groups{i,1});
         groupHandles{i,2}.set('String', session.tra_groups{i,2});
         groupHandles{i,3}.set('String', session.tra_groups{i,3});
+        groupHandles{i,5}.set('UserData', session.tra_groups{i,5});
         
         setappdata(handles.f,'trace_groupHandles',groupHandles);
     end
@@ -566,13 +572,34 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
             donorLimits     = getappdata(handles.f,'donorLimits');
             acceptorLimits  = getappdata(handles.f,'acceptorLimits');
             
+            donorBGRule = getappdata(handles.f,'trace_donorBGRule');
+            if isempty(donorBGRule)
+                donorBGRule = '0';
+            else
+                try
+                    temp = eval(donorBGRule);
+                catch
+                    donorBGRule = '0';
+                end
+            end
+            
+            acceptorBGRule = getappdata(handles.f,'trace_acceptorBGRule');
+            if isempty(acceptorBGRule)
+                acceptorBGRule = '0';
+            else
+                try
+                    temp = eval(acceptorBGRule);
+                catch
+                    acceptorBGRule = '0';
+                end
+            end
+            
             if isempty(donorLimits)
                 return;
             end
             
-            removeBG        = handles.tra.removeBGCheckbox.Value;
-    
-            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2), removeBG);
+                
+            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2),donorBGRule,acceptorBGRule);
             setappdata(handles.f,'traces',traces); % save
             
             delete(hWaitBar);
@@ -602,7 +629,7 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
             delete(getappdata(handles.f,'data_trace_plt'));
         end
         hold(handles.tra.vidAxes,'on');
-        plt = viscircles(handles.tra.vidAxes, [traces.Center(c,:);traces.Center(c,:)], [traces.HalfWidth(c)/3,traces.HalfWidth(c)*2], 'Color', 'white', 'LineWidth', .1);
+        plt = viscircles(handles.tra.vidAxes, traces.Center(c,:), traces.HalfWidth(c)*2, 'Color', 'white', 'LineWidth', .1);
         hold(handles.tra.vidAxes,'off');
         setappdata(handles.f,'data_trace_plt',plt);
         mag = handles.tra.vidAxesAPI.getMagnification();
@@ -624,6 +651,67 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
             setScale(hObject,lowDA,highDA);
         end
     end
+end
+
+%% Remove Background
+function setBGRule(hObject,handles)
+    %% donnor
+    % promp user
+    prompt = 'Set rule for donor background';
+    ansArray = inputdlg(    prompt,... % prompt
+                            '',... % title
+                            [3 50],... % dims
+                            {getappdata(handles.f,'trace_donorBGRule')}); % starting input
+    if isempty(ansArray) % user selects cancel
+        return;
+    end
+    rule = ansArray{1};
+    setappdata(handles.f,'trace_donorBGRule',rule);
+    
+     % evluate prompt
+    traces = getappdata(handles.f,'traces');
+    if ~isempty(rule)
+        try
+            results = eval(rule);
+        catch e
+            errordlg(e.message,'','modal');
+            results = zeros(size(traces,1),1);
+        end
+    else
+        results = zeros(size(traces,1),1);
+    end
+    
+    %% acceptor
+    % promp user
+    prompt = 'Set rule for acceptor background';
+    ansArray = inputdlg(    prompt,... % prompt
+                            '',... % title
+                            [3 50],... % dims
+                            {getappdata(handles.f,'trace_acceptorBGRule')}); % starting input
+    if isempty(ansArray) % user selects cancel
+        return;
+    end
+    rule = ansArray{1};
+    setappdata(handles.f,'trace_acceptorBGRule',rule);
+    
+     % evluate prompt
+    traces = getappdata(handles.f,'traces');
+    if ~isempty(rule)
+        try
+            results = eval(rule);
+        catch e
+            errordlg(e.message,'','modal');
+            results = zeros(size(traces,1),1);
+        end
+    else
+        results = zeros(size(traces,1),1);
+    end
+    
+    %% reset
+    handles.tra.preCalButton.Enable = 'on';
+    traces.Calculated  = zeros(size(traces,1),1,'logical');
+    setappdata(handles.f,'traces',traces);
+    updateDisplay(hObject,handles);
 end
 
 %% Groups
@@ -657,7 +745,7 @@ function addGroup(hObject,handles,loadingFlag)
         uiwait(msgbox('Only 5 groups allowed.'));
         return;
     end
-    
+        
     % show
     groupHandles{numRows, 1} = uicontrol(   'Parent', handles.tra.group.grid,...
                                             'Style', 'Checkbox',...
@@ -682,7 +770,8 @@ function addGroup(hObject,handles,loadingFlag)
     % rule
     groupHandles{numRows, 5} = uicontrol(   'Parent', handles.tra.group.grid,...
                                             'Callback', @(hObject,~) setGroupRule(hObject,numRows),...
-                                            'String', 'Set');
+                                            'String', 'Set',...
+                                            'UserData','');
                                         
     % delete
     groupHandles{numRows, 6} = uicontrol(   'Parent', handles.tra.group.grid,...
@@ -720,16 +809,28 @@ function setGroupRule(hObject,rowNum)
     prompt = ['Set group rule for ' groupHandles{rowNum,1}.get('String')];
     ansArray = inputdlg(    prompt,... % prompt
                             '',... % title
-                            [3 50]); % dims
+                            [3 50],... % dims
+                            {groupHandles{rowNum,5}.get('UserData')}); % starting text
     if isempty(ansArray) % user selects cancel
         return;
     end
     rule = ansArray{1};
+    groupHandles{rowNum,5}.set('UserData',rule)
     
     
     % evluate prompt
     traces = getappdata(handles.f,'traces');
-    results = eval(rule);
+    if ~isempty(rule)
+        try
+            results = eval(rule);
+        catch e
+            errordlg(e.message,'','modal');
+            results = zeros(size(traces,1),1);
+        end
+    else
+        results = zeros(size(traces,1),1,'logical');
+    end
+    
     traces.Groups(:,rowNum) = results;
     setappdata(handles.f,'traces',traces);
     c = getappdata(handles.f,'trace_currentTrace');
@@ -930,14 +1031,35 @@ function preCalculateAllTraces(hObject, handles)
     maxStates       = handles.tra.hmmStatesSlider.JavaPeer.get('HighValue');
     donorLimits     = getappdata(handles.f,'donorLimits');
     acceptorLimits  = getappdata(handles.f,'acceptorLimits');
-    removeBG        = handles.tra.removeBGCheckbox.Value;
+    
+    donorBGRule = getappdata(handles.f,'trace_donorBGRule');
+    if isempty(donorBGRule)
+        donorBGRule = '0';
+    else
+        try
+            temp = eval(donorBGRule);
+        catch
+            donorBGRule = '0';
+        end
+    end
+
+    acceptorBGRule = getappdata(handles.f,'trace_acceptorBGRule');
+    if isempty(acceptorBGRule)
+        acceptorBGRule = '0';
+    else
+        try
+            temp = eval(acceptorBGRule);
+        catch
+            acceptorBGRule = '0';
+        end
+    end
     
     % run calcualtions
     uncalculatedTraces = ~traces.Calculated;
     parWaitbar('start', 'Calculating parameters for traces', numTraces);
     parfor c=1:numTraces
         if uncalculatedTraces(c)
-            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2), removeBG);
+            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2),donorBGRule,acceptorBGRule);
         end
         
         parWaitbar;
@@ -950,7 +1072,7 @@ function preCalculateAllTraces(hObject, handles)
     setappdata(handles.f,'traces',traces);
 end
 
-function trace = calculateTraceData(trace, movMeanWidth, x, minStates, maxStates, donorScale, acceptorScale, removeBG)
+function trace = calculateTraceData(trace, movMeanWidth, x, minStates, maxStates, donorScale, acceptorScale, donorBGRule, acceptorBGRule)
     % Get original traces
     Donor       = movmean(trace.Donor_raw(1,x), movMeanWidth);
     Acceptor    = movmean(trace.Acceptor_raw(1,x), movMeanWidth);
@@ -958,18 +1080,16 @@ function trace = calculateTraceData(trace, movMeanWidth, x, minStates, maxStates
     % Hmm
     trace.Donor_hmm(1,x)       = vbFRETWrapper(Donor/donorScale, minStates, maxStates) * donorScale;
     trace.Acceptor_hmm(1,x)    = vbFRETWrapper(Acceptor/acceptorScale, minStates, maxStates) * acceptorScale;
+
     % Background
-    trace.Donor_bg(1)          = min(trace.Donor_hmm(1,x));
-    trace.Acceptor_bg(1)       = min(trace.Acceptor_hmm(1,x));
-    if removeBG
-        trace.Donor_hmm(1,x)       = trace.Donor_hmm(1,x) - trace.Donor_bg(1);
-        trace.Acceptor_hmm(1,x)    = trace.Acceptor_hmm(1,x) - trace.Acceptor_bg(1);
-        trace.Donor(1,x)           = Donor - trace.Donor_bg(1);
-        trace.Acceptor(1,x)        = Acceptor - trace.Acceptor_bg(1);
-    else
-        trace.Donor(1,x)           = Donor;
-        trace.Acceptor(1,x)        = Acceptor;
-    end
+    traces = trace; % this is nessasry for the following eval
+    trace.Donor_bg(1)          = eval(donorBGRule);
+    trace.Acceptor_bg(1)       = eval(acceptorBGRule);
+    trace.Donor_hmm(1,x)       = trace.Donor_hmm(1,x) - trace.Donor_bg(1);
+    trace.Acceptor_hmm(1,x)    = trace.Acceptor_hmm(1,x) - trace.Acceptor_bg(1);
+    trace.Donor(1,x)           = Donor - trace.Donor_bg(1);
+    trace.Acceptor(1,x)        = Acceptor - trace.Acceptor_bg(1);
+    
     % Fret
     trace.FRET(1,x)            = trace.Acceptor(1,x) ./ (trace.Acceptor(1,x) + trace.Donor(1,x));
     noFRETInd                  = (trace.Donor_hmm(1,:)==0 | trace.Acceptor_hmm(1,:)==0);
@@ -1109,18 +1229,6 @@ function setMean_Slider(hObject)
     updateDisplay(hObject,handles);
 end
 
-function setRemoveBG(hObject)
-    handles = guidata(hObject);
-    
-    % reset all pre-calculations
-    handles.tra.preCalButton.Enable = 'on';
-    traces = getappdata(handles.f,'traces');
-    traces.Calculated  = zeros(size(traces,1),1,'logical');
-    setappdata(handles.f,'traces',traces); % save before updating
-    
-    updateDisplay(hObject,handles);
-end
-
 %% HMM Settings
 function setHMMStates_LowTextBox(hObject)
     handles = guidata(hObject);
@@ -1168,10 +1276,6 @@ function displayAnalysis(hObject,handles)
     exportFlag = false;
     
     switch handles.tra.export.menu.String{handles.tra.export.menu.Value}
-        case 'Export Traces'
-            uiwait(msgbox('Only for export.'));
-        case 'Export Images of Traces'
-            uiwait(msgbox('Only for export.'));
         case 'Histograms'
             analysisHistograms(hObject, handles, exportFlag, false);
         case 'HMM Histograms'
@@ -1182,6 +1286,12 @@ function displayAnalysis(hObject,handles)
             uiwait(msgbox('Only for export.'));
         case 'Post-sync'
             displayPSH(hObject, handles);
+        case 'Correlation'
+            displayCorrelation(hObject, handles);
+        case 'Dwell Times'
+            displayDwellTimes(hObject, handles);
+        otherwise
+            uiwait(msgbox('Only for export.'));
     end
 end
 
@@ -1204,11 +1314,9 @@ function exportAnalysis(hObject,handles)
             analysisHistograms(hObject, handles, exportFlag, false);
         case 'HMM Histograms'
             analysisHistograms(hObject, handles, exportFlag, true);
-        case 'Transition Density'
-            uiwait(msgbox('Only for display.'));
         case 'Transition Count'
             exportTransCounts(hObject, handles);
-        case 'Post-sync'
+        otherwise
             uiwait(msgbox('Only for display.'));
     end
 end
@@ -1470,4 +1578,89 @@ function displayPSH(hObject, handles)
     ylabel('FRET');
     shading interp;
     view(0,90); % birds-eye
+end
+
+% Correlation
+function displayCorrelation(hObject, handles)
+    %% Setups
+    % get all the trace data
+    traces = getappdata(handles.f,'traces');
+    shownTraceIdx = getShownTraces(hObject, handles);
+    traces = traces(shownTraceIdx,:);
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    T = (startT:endT);
+    
+    %% Calculation
+    % grab all the traces in one array of each type
+    donor       = traces.Donor(:,T); 
+    acceptor    = traces.Acceptor(:,T); 
+    fret        = traces.FRET(:,T); 
+    
+    % calculate all the cross-correlations
+    DACorr    = FRETCorr(donor,    acceptor);
+    DAutoCorr = FRETCorr(donor,    donor);
+    AAutoCorr = FRETCorr(acceptor, acceptor);
+    FAutoCorr = FRETCorr(fret,     fret);
+    
+    %% Display
+    % plot the correlations
+    f = figure;
+    ax = axes(f);
+
+    ax1 = subplot(2, 2, 1, ax); % 
+    plot(ax1, 1:length(DACorr), DACorr);
+    hold on;
+    title(ax1, "Donor-Acceptor Cross-correlation");
+    hold off;
+
+    ax2 = subplot(2, 2, 2); % 
+    plot(ax2, 1:length(DAutoCorr), DAutoCorr);
+    hold on;
+    title(ax2, "Donor Auto-correlation");
+    hold off;
+    
+    ax3 = subplot(2, 2, 3); % 
+    plot(ax3, 1:length(AAutoCorr), AAutoCorr);
+    hold on;
+    title(ax3, "Acceptor Auto-correlation");
+    hold off;
+    
+    ax4 = subplot(2, 2, 4); % 
+    plot(ax4, 1:length(FAutoCorr), FAutoCorr);
+    hold on;
+    title(ax4, "FRET Auto-correlation");
+    hold off;
+end
+
+% Dwell Times
+function displayDwellTimes(hObject, handles)
+    %% Setups
+    % get all the trace data
+    traces = getappdata(handles.f,'traces');
+    shownTraceIdx = getShownTraces(hObject, handles);
+    traces = traces(shownTraceIdx,:);
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    T = (startT:endT);
+    
+    %% Calculation
+    % grab all the traces in one array of each type
+    fret        = traces.FRET_hmm(:,T); 
+    
+    % calculate all the cross-correlations
+    FRETDT      = FRETDwellTimes(fret);
+    
+    %% Display
+    % plot the correlations
+    f = figure;
+    axes(f);
+
+    numStates = length(FRETDT);
+    for s = 1:numStates
+        subplot(1, numStates, s);
+        histogram(FRETDT{s,1});
+        title(['FRET State ' num2str(s) ' Dwell Times']);
+        
+    end
 end

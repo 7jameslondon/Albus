@@ -18,7 +18,7 @@ function main
     addpath([mpath '/vbfret/src']);
     addpath([mpath '/vbfret/ext_src']);
         
-    addpath([mpath '/GUI_Layout_Toolbox_2/layout/']);
+    addpath([mpath '/GUI Layout Toolbox 2/layout/']);
 
     %% Interface
     handles = createInterface;

@@ -61,7 +61,7 @@ function updateParWaitbar(hTimer,hWaitbar,startClock)
                 
         % Slow down the timer after a while then give a time estamate
         if hTimer.UserData % currently a fast timer
-            if hTimer.Period == 1 && hTimer.TasksExecuted >= 60 % its been a minute
+            if hTimer.Period == 1 && hTimer.TasksExecuted >= 10 % its been 10 seconds
                 stop(hTimer);
                 hTimer.Period = 10; % slow down to checking every 10 seconds
                 hTimer.UserData = false;
