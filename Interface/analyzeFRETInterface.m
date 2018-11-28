@@ -80,7 +80,17 @@ function handles = createInterface(handles)
                                                 'String', 'Set Background Rule',...
                                                 'Callback', @(hObject,~) setBGRule(hObject,guidata(hObject)));
                                             
-    handles.tra.settingsBox.set('Heights',[25,20,20,20,20,20]);
+    % Frame Rate
+    handles.tra.frameRateBox = uix.HBox('Parent', handles.tra.settingsBox);
+    uicontrol( 'Parent', handles.tra.frameRateBox,...
+               'Style' , 'text', ...
+               'String', 'Frame Rate (time/frame)');
+    handles.tra.frameRate = uicontrol(  'Parent', handles.tra.frameRateBox,...
+                                            'String', '1',...
+                                            'Style', 'edit',...
+                                            'Callback', @(hObject,~) updateDisplay(hObject,guidata(hObject)));
+                                            
+    handles.tra.settingsBox.set('Heights',[25,20,20,20,20,30,25]);
                                     
     %% selection
     handles.tra.selectionPanel = uix.BoxPanel(  'Parent', handles.tra.leftPanel,...
@@ -307,9 +317,11 @@ function handles = createInterface(handles)
     handles.tra.DAScaleBox.set('Heights',[15 15 -1]);
     
     uix.Empty('Parent', handles.tra.graphGrid);
+    uix.Empty('Parent', handles.tra.graphGrid);
     handles.tra.DAAxes              = axes(handles.tra.graphGrid);
     handles.tra.FRETAxes            = axes(handles.tra.graphGrid);
-    handles.tra.graphGrid.set('Widths',[30 -1],'Heights',[-1 -1]);
+    handles.tra.PosAxes             = axes(handles.tra.graphGrid);
+    handles.tra.graphGrid.set('Widths',[30 -1],'Heights',[-1 -1 -1]);
     
     % plots
     handles.tra.DonorPlot           = plot(handles.tra.DAAxes, 1, '-');
@@ -341,9 +353,18 @@ function handles = createInterface(handles)
     handles.tra.FRETPlot.Color      = [9.8, 54.1, 54.1]/100;
     handles.tra.FRETStatePlot.Color = [0.0, 00.0, 00.0]/100;
     
+    % Centers
+    handles.tra.ColocalizationPlot = plot(handles.tra.PosAxes, 1, '-');
+    handles.tra.ColocalizationPlot.LineWidth = 2;
+    handles.tra.ColocalizationPlot.Color     = [25, 25, 50]/100;
+    
     % current frame arrows on traces
-    handles.tra.curFrameArrowDA   = text(handles.tra.DAAxes,   1,0,char(8593),'HorizontalAlignment','center','VerticalAlignment','top');
-    handles.tra.curFrameArrowFRET = text(handles.tra.FRETAxes, 1,0,char(8593),'HorizontalAlignment','center','VerticalAlignment','top');
+    handles.tra.curFrameArrowDA   = text(handles.tra.DAAxes,   1,0,char(8593),...
+        'HorizontalAlignment','center','VerticalAlignment','top');
+    handles.tra.curFrameArrowFRET = text(handles.tra.FRETAxes, 1,0,char(8593),...
+        'HorizontalAlignment','center','VerticalAlignment','top');
+    handles.tra.curFrameArrowPos  = text(handles.tra.PosAxes, 1,0,char(8593),...
+        'HorizontalAlignment','center','VerticalAlignment','top');
 end
 
 %% Load from session
@@ -605,6 +626,14 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
             delete(hWaitBar);
         end
         
+        % Frame rate adjustment for all plots
+        frameRate = str2double(handles.tra.frameRate.String);
+        ticks = handles.tra.DAAxes.XTick;
+        ticks = arrayfun(@num2str, ticks*frameRate, 'un', 0);
+        handles.tra.DAAxes.XTickLabel = ticks;
+        handles.tra.FRETAxes.XTickLabel = ticks;
+        handles.tra.PosAxes.XTickLabel = ticks;
+        
         % Donor Trace
         handles.tra.DonorPlot.XData         = x;
         handles.tra.DonorPlot.YData         = traces.Donor(c,x);
@@ -623,6 +652,10 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         handles.tra.FRETStatePlot.XData     = x;
         handles.tra.FRETStatePlot.YData     = traces.FRET_hmm(c,x);
         axis(handles.tra.FRETAxes, [startT, endT, -0.05, 1.05]);
+        
+        % Centers
+        handles.tra.ColocalizationPlot.XData    = x;
+        handles.tra.ColocalizationPlot.YData    = traces.DADistance(c,x);
         
         % Video peak circle
         if isappdata(handles.f,'data_trace_plt')
@@ -1555,6 +1588,7 @@ function displayPSH(hObject, handles)
     startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
     endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
     T = (startT:endT);
+    frameRate = str2double(handles.tra.frameRate.String);
     
     %% Calculation
     fret  = traces.FRET_hmm(:,T); % grab all the FRET traces in one matrix
@@ -1564,6 +1598,8 @@ function displayPSH(hObject, handles)
         times = times(fret>0.01);
         fret = fret(fret>0.01);
     end
+    
+    times = times * frameRate;
     
     [N, X, Y] = histcounts2(times(:),fret(:),1:3:length(T), 0:.05:1);
     X = movmean(X,2,'Endpoints','discard'); % convert endpoints to centers
@@ -1643,6 +1679,7 @@ function displayDwellTimes(hObject, handles)
     startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
     endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
     T = (startT:endT);
+    frameRate = str2double(handles.tra.frameRate.String);
     
     %% Calculation
     % grab all the traces in one array of each type
@@ -1650,6 +1687,7 @@ function displayDwellTimes(hObject, handles)
     
     % calculate all the cross-correlations
     FRETDT      = FRETDwellTimes(fret);
+    FRETDT      = frameRate * FRETDT;
     
     %% Display
     % plot the correlations

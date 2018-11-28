@@ -123,6 +123,7 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             session.fret_lowBrightness   = get(handles.fret.brightness.JavaPeer, 'LowValue');
             session.fret_highBrightness  = get(handles.fret.brightness.JavaPeer, 'HighValue');
             session.fret_timeAvg         = handles.fret.sourceTimeAvgCheckBox.Value;
+            session.fret_width           = handles.fret.widthSlider.JavaPeer.get('Value')/2;
             
             session.fret_particleIntensityLow   = handles.fret.particleIntensity.JavaPeer.get('LowValue');
             session.fret_particleIntensityHigh  = handles.fret.particleIntensity.JavaPeer.get('HighValue');

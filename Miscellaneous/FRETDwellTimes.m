@@ -8,8 +8,6 @@ function dwellTimes = FRETDwellTimes(traces)
         
         if length(states) == 1
             continue;
-        else
-            states = states(2:end);
         end
         
         % add new state to dwellTimes if nessasary

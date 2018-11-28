@@ -19,6 +19,9 @@ function main
     addpath([mpath '/vbfret/ext_src']);
         
     addpath([mpath '/GUI Layout Toolbox 2/layout/']);
+    
+    set(groot,'defaultFigureCreateFcn','addToolbarExplorationButtons(gcf)');
+    set(groot,'defaultAxesCreateFcn','set(get(gca,''Toolbar''),''Visible'',''off'')');
 
     %% Interface
     handles = createInterface;

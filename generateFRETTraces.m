@@ -13,7 +13,8 @@ function generateFRETTraces(hObject, handles)
         numStacks = 1;
     end
     
-    I = generateFRETInterface('getCurrentImage',hObject,handles);
+    I = generateFRETInterface('getCurrentImage',hObject,handles,1); % 1 stops brightness setting being applied
+    
     filterSize = handles.fret.particleFilter.JavaPeer.get('Value') / handles.fret.particleFilter.JavaPeer.get('Maximum') * 5;
     particleMinInt = handles.fret.particleIntensity.JavaPeer.get('LowValue');
     particleMaxInt = handles.fret.particleIntensity.JavaPeer.get('HighValue');
@@ -27,6 +28,8 @@ function generateFRETTraces(hObject, handles)
     startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
     endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
     
+    width = handles.fret.widthSlider.JavaPeer.get('Value')/2;
+    
     %% Find particles
     particles = findParticles(I, particleMinInt, particleMaxInt, filterSize,...
                                 'Method','GaussianFit',...
@@ -36,7 +39,7 @@ function generateFRETTraces(hObject, handles)
                                 'MinDistance', particleMinDistance);
     traces = particles{1};    
     
-    traces.HalfWidth = 2.5 * ones(size(traces.HalfWidth));
+    traces.HalfWidth = width/2 * ones(size(traces.HalfWidth));
     
     %% Calculate the donor and acceptor raw traces
     numTraces = size(traces,1);
@@ -93,7 +96,81 @@ function generateFRETTraces(hObject, handles)
     traces.Donor_raw = Donor_raw;
     traces.Acceptor_raw = Acceptor_raw;
     
-    % pre-aloc traces
+    %% Calculate the donor and acceptor centers
+    
+    traces.DADistance = traces.Donor_raw*NaN;
+        
+%     I_height = size(I,1);
+%     I_width = size(I,2);
+%     blankMask = zeros(I_height,I_width);
+%     maxInt = getappdata(handles.f,'video_maxIntensity');
+%     
+%     for t=1:numTraces % no parfor becuase seperatedStacks is too big :(
+%         
+%         if numStacks == 2
+%             minX = max(round(traces.Center(t,2)-width*1.5),1);
+%             maxX = min(round(traces.Center(t,2)+width*1.5),I_width);
+%             minY = max(round(traces.Center(t,1)-width*1.5),1);
+%             maxY = min(round(traces.Center(t,1)+width*1.5),I_width);
+%             mask = blankMask;
+%             mask(minY:maxY,minX:maxX) = 1;
+%             
+%             donorPerFrame    = findParticles(seperatedStacks{1}, 0, maxInt, filterSize,...
+%                                         'Method','Centroid',...
+%                                         'Mask', mask);
+%             acceptorPerFrame = findParticles(seperatedStacks{2}, 0, maxInt, filterSize,...
+%                                         'Method','Centroid',...
+%                                         'Mask', mask);
+%                                     
+%             Donor_centersX = ones(1,dur)*NaN;
+%             Donor_centersY = ones(1,dur)*NaN;
+%             Acceptor_centersX = ones(1,dur)*NaN;
+%             Acceptor_centersY = ones(1,dur)*NaN;
+%     
+%             for f=1:dur
+%                 % donor
+%                 donors = donorPerFrame{f} - traces.Center(t,:);
+%                 if size(donors,1) == 1
+%                     
+%                     Donor_centersX(f) = donors(1,1);
+%                     Donor_centersY(f) = donors(1,2);
+%                     
+%                 elseif size(donors,1) > 1
+%                     
+%                     distr  = xy2r(donors(:,1), donors(:,2));
+%                     [~, ind] = min(distr);
+%                     
+%                     Donor_centersX(f) = donors(ind,1);
+%                     Donor_centersY(f) = donors(ind,2);
+%                     
+%                 end
+%                 
+%                 % acceptor
+%                 acceptors = acceptorPerFrame{f} - traces.Center(t,:);
+%                 if size(acceptors,1) == 1
+%                     Acceptor_centersX(f) = acceptors(1,1);
+%                     Acceptor_centersY(f) = acceptors(1,2);
+%                     
+%                 elseif size(acceptors,1) > 1
+%                     
+%                     distr  = xy2r(acceptors(:,1), acceptors(:,2));
+%                     [~, ind] = min(distr);
+%                     
+%                     Acceptor_centersX(f) = acceptors(ind,1);
+%                     Acceptor_centersY(f) = acceptors(ind,2);
+%                 end
+%             end
+%         elseif numStacks == 1
+%             
+%         end
+%         
+%         traces(t,:).DADistance = xy2r(Donor_centersX - Acceptor_centersX, Donor_centersY - Acceptor_centersY);
+%         
+%         waitbar(t/numTraces);
+%         
+%     end
+    
+    % pre-alocs
     preAloc = zeros(numTraces, dur);
     traces.Donor        = preAloc;
     traces.Donor_hmm    = preAloc;

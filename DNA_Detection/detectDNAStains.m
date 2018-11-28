@@ -26,7 +26,7 @@ function detectDNAStains(hObject, handles)
 
     for i=1:numTotalFound
         center = S(i,:).Centroid;
-        rects(i,:) = [center(1)-size(dnaKernal,2), center(2)-size(dnaKernal,1), size(dnaKernal,2), size(dnaKernal,1)];
+        rects(i,:) = [center(1)-size(dnaKernal,2)/2, center(2)-size(dnaKernal,1)/2, size(dnaKernal,2), size(dnaKernal,1)];
 
         dnaImage = imcrop(I,rects(i,:));
 

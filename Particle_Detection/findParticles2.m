@@ -14,7 +14,7 @@
 % Method            Default: 'WeightedCentroid'
 % DisplayAxes       Default: []
 
-function particlesByFrame = findParticles( varargin )
+function particlesByFrame = findParticles2( varargin )
     %% Parse inputs
     p = inputParser;
     

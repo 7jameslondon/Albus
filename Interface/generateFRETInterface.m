@@ -92,8 +92,30 @@ function handles = createInterface(handles)
     handles.fret.autoBrightnessButton = uicontrol('Parent', handles.fret.autoAndInvertHBox,...
                                                  'String', 'Auto Brightness',...
                                                  'Callback', @(hObject,~) autoBrightness(hObject, guidata(hObject)));
+                                             
+    %% width
+    % box
+    handles.fret.WidthBox = uix.HBox('Parent', handles.fret.preProcBox);
+    % text
+    uicontrol( 'Parent', handles.fret.WidthBox,...
+               'Style' , 'text', ...
+               'String', 'Gaussina Width');
+    % textbox
+    handles.fret.widthTextbox = uicontrol(   'Parent', handles.fret.WidthBox,...
+                                                    'Style' , 'edit', ...
+                                                    'String', '5',...
+                                                    'Callback', @(hObject,~) setWidth(hObject,str2double(hObject.String)));
+    % slider
+    [~, handles.fret.widthSlider] = javacomponent('javax.swing.JSlider');
+    handles.fret.widthSlider.set('Parent', handles.fret.WidthBox);
+    handles.fret.widthSlider.JavaPeer.set('Maximum', 18);
+    handles.fret.widthSlider.JavaPeer.set('Minimum', 0.5);
+    handles.fret.widthSlider.JavaPeer.set('Value', 10);
+    handles.fret.widthSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setWidth(handles.fret.widthSlider, handles.fret.widthSlider.JavaPeer.get('Value')/2));
+    
+    handles.fret.WidthBox.set('Widths',[100 50 -1]);
                                                 
-    handles.fret.preProcBox.set('Heights',[25 25 15 25 25]);
+    handles.fret.preProcBox.set('Heights',[25 25 15 25 25 25]);
     handles.fret.sourceBox.set('Heights',[25 25 150]);
     
     %% Auto Detection
@@ -239,7 +261,7 @@ function handles = createInterface(handles)
                                             'Callback', @(hObject,~) openTraces(hObject, guidata(hObject)));
                                                  
     %% 
-    handles.fret.leftPanel.set('Heights',[25 200 135 175 60]);
+    handles.fret.leftPanel.set('Heights',[25 230 135 175 60]);
 end
 
 %% Load from session
@@ -305,6 +327,10 @@ function handles = loadFromSession(hObject,handles,session)
     handles.fret.minDistanceTextBox.String = num2str(session.fret_minDistance / handles.fret.minDistanceSlider.JavaPeer.get('Maximum') * 20);
     handles.fret.edgeDistanceTextBox.String = num2str(session.fret_edgeDistance / handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum') * 20);
         
+    % width
+    handles.fret.widthSlider.JavaPeer.set('Value', session.fret_width*2);
+    handles.fret.widthTextbox.String = num2str(session.fret_width);
+    
     switchMode(hObject, handles, session.fret_mode);
 end
 
@@ -409,6 +435,17 @@ function handles = setVideoFile(hObject, handles, filePath)
     close(hWaitBar);
 end
 
+%% Width Callback
+function setWidth(hObject, value)
+    handles = guidata(hObject);
+    
+    handles.fret.widthSlider.JavaPeer.set('Value', value*2);
+    value = handles.fret.widthSlider.JavaPeer.get('Value')/2;
+    handles.fret.widthTextbox.String = num2str(value);
+    
+    updateDisplay(hObject, handles);
+end
+
 %% Display
 function onDisplay(hObject,handles)
     % current frame
@@ -454,20 +491,19 @@ function updateDisplay(hObject,handles)
     end
     
     % get data
+    I_raw = getCurrentImage(hObject,handles,1); % 1 stops brightness setting being applied
     I = getCurrentImage(hObject,handles);
     
-    filterSize = handles.fret.particleFilter.JavaPeer.get('Value') / handles.fret.particleFilter.JavaPeer.get('Maximum') * 5;
     particleMinInt = handles.fret.particleIntensity.JavaPeer.get('LowValue');
     particleMaxInt = handles.fret.particleIntensity.JavaPeer.get('HighValue');
     combinedROIMask = getappdata(handles.f,'combinedROIMask');
+    width = handles.fret.widthSlider.JavaPeer.get('Value')/2;
+    
+    combinedROIMask = getappdata(handles.f,'combinedROIMask');
+    handles.fret.particleIntensity.JavaPeer.set('Minimum', min(I_raw(combinedROIMask))-1);
+    handles.fret.particleIntensity.JavaPeer.set('Maximum', max(I_raw(combinedROIMask))+1);
     
     particleClustering = handles.fret.clusterCheckBox.Value;
-
-    % filter image
-    if filterSize > 0.1
-        I = imgaussfilt(I, filterSize);
-    end
-    I = imadjust(I);
     
     % display filtered image
     handles.oneAxes.AxesAPI.replaceImage(I,'PreserveView',true);
@@ -477,18 +513,18 @@ function updateDisplay(hObject,handles)
         particleMaxEccentricity = handles.fret.eccentricitySlider.JavaPeer.get('Value') / handles.fret.eccentricitySlider.JavaPeer.get('Maximum');
         particleMinDistance = handles.fret.minDistanceSlider.JavaPeer.get('Value') / handles.fret.minDistanceSlider.JavaPeer.get('Maximum') * 20;
         edgeDistance = handles.fret.edgeDistanceSlider.JavaPeer.get('Value') / handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum') * 20;
-
-        particles = findParticles(I, particleMinInt, particleMaxInt,...
+        
+        particles = findParticles(I_raw, particleMinInt, particleMaxInt,...
                                     'EdgeDistance', edgeDistance,...
                                     'Mask', combinedROIMask,...
                                     'MaxEccentricity',particleMaxEccentricity,...
                                     'MinDistance', particleMinDistance);
                                 
-        totalParticles = findParticles(I, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
+        totalParticles = findParticles(I_raw, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
         
         totalParticlesCount = size(totalParticles{1},1);
     else
-        particles = findParticles(I, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
+        particles = findParticles(I_raw, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
         totalParticlesCount = size(particles{1},1);
     end
     centers = particles{1};
@@ -500,7 +536,7 @@ function updateDisplay(hObject,handles)
     if ~isempty(plt)
         delete(plt);
     end
-    plt = plot( handles.oneAxes.Axes, centers(:,1), centers(:,2), '+r');
+    plt = viscircles( handles.oneAxes.Axes, centers, centers(:,1)*0+width/2, 'EnhanceVisibility', false, 'LineWidth', 1);
     hold(handles.oneAxes.Axes,'off');
     setappdata(handles.f,'data_fret_plt',plt);
     
@@ -591,6 +627,7 @@ end
 function I = getCurrentImage(hObject,handles,brightnessflag)
     % get values
     currentFrame = getappdata(handles.f,'fret_currentFrame');
+    filterSize = handles.fret.particleFilter.JavaPeer.get('Value') / handles.fret.particleFilter.JavaPeer.get('Maximum') * 5;
     timeAverage = handles.fret.sourceTimeAvgCheckBox.Value;
     lowBrightness = get(handles.fret.brightness.JavaPeer,'LowValue')/get(handles.fret.brightness.JavaPeer,'Maximum');
     highBrightness = get(handles.fret.brightness.JavaPeer,'HighValue')/get(handles.fret.brightness.JavaPeer,'Maximum');
@@ -608,12 +645,16 @@ function I = getCurrentImage(hObject,handles,brightnessflag)
     if invertImage
         I = imcomplement(I);
     end
+    % filter image
+    if filterSize > 0.1
+        I = imgaussfilt(I, filterSize);
+    end
+    % crop mask
+    I(~combinedROIMask) = 0;
     % brightness
     if ~exist('brightnessflag','var') % used for autobrightness
-        I = imadjust(I,[lowBrightness,highBrightness]);
+        I(combinedROIMask) = imadjust(I(combinedROIMask),[lowBrightness,highBrightness]);
     end
-    % crop overlay
-    I(~combinedROIMask) = 0;
 end
 
 %% Play/pause Current Frame
@@ -672,13 +713,9 @@ end
 
 function autoBrightness(hObject, handles)
     I = getCurrentImage(hObject,handles,1); % 1 is for no brightness flag
+    combinedROIMask = getappdata(handles.f,'combinedROIMask');
     
-    if isappdata(handles.f,'data_video_originalSeperatedStacks')
-        combinedROIMask = getappdata(handles.f,'combinedROIMask');
-        autoImAdjust = stretchlim(I(combinedROIMask));
-    else
-        autoImAdjust = stretchlim(I);
-    end
+    autoImAdjust = stretchlim(I(combinedROIMask));
     
     autoImAdjust = round(autoImAdjust * get(handles.fret.brightness.JavaPeer,'Maximum'));
     

@@ -1,142 +1,58 @@
-%%
+%% Setup/Import
+mpath = fileparts(which(mfilename));
+addpath([mpath '/Registration']);
+addpath([mpath '/Interface']);
+addpath([mpath '/Tracking']);
+addpath([mpath '/Particle_Detection']);
+addpath([mpath '/DNA_Detection']);
+addpath([mpath '/Drift_Correction']);
+addpath([mpath '/Miscellaneous']);
 
-seperatedStacks = getappdata(handles.f,'data_mapping_originalSeperatedStacks');
-I = imadjust(seperatedStacks{2}(:,:,1));
+filePath = ['/Users/jameslondon/Documents/Fishel Lab/JL Nature Data/2016-',...
+            '01-12_Ecoli_10nM MutS Alexa 647_20nM MutL Cy3 R95F_1mM ATP_1',...
+            '00mM NaCl_DoubleBiotn17KbSMPL_300ms_0.6sec Timelapse/MutS+Mut',...
+            'L 1_300ms_1/MutS+MutL 1_300ms_1_MMStack_Pos0.',...
+            'ome.tif'];
 
-figure(2)
-
-ax1 = subaxis(2,3,1);
-axis tight;
-imshow(I,'Parent',ax1);
-title(ax1,'(a)');
-
-J = imadjust(imgaussfilt(I,.6));
-ax1 = subaxis(2,3,2);
-imshow(J,'Parent',ax1);
-title(ax1,'(b)');
-
-% 1.8189e-04
-K = imregionalmax(J);
-ax1 = subaxis(2,3,3);
-imshow(K,'Parent',ax1);
-title(ax1,'(c)');
-
-% 0.0070
-BW = imregionalmax(J);
-stats = regionprops('Table',BW,J,'MeanIntensity','Centroid');
-selectedIdx = stats.MeanIntensity > .5*2^16;
-selectedIdx = find(selectedIdx);
-L = bwlabel(BW);
-K = BW.*0;
-for i=1:size(selectedIdx,1)
-    K = K + (L==selectedIdx(i));
-end
-ax1 = subaxis(2,3,4);
-imshow(K,'Parent',ax1);
-title(ax1,'(d)');
-
-
-
-ax1 = subaxis(2,3,5);
-imshow(I,'Parent',ax1);
-title(ax1,'(e)');
-hold on;
-for i=1:size(selectedIdx,1)
-    center = stats(selectedIdx(i),:).Centroid;
-    plot(center(1),center(2),'r+');
-end
-hold off;
-
-
-% 22.033132/100
-centers = findParticles(I,0.5*2^16,1.0*2^16,0.5,'Method','GaussianFit');
-centers = centers{1}.Center;
-ax1 = subaxis(2,3,6);
-imshow(I,'Parent',ax1);
-title(ax1,'(f)');
-hold on;
-for i=1:size(centers,1)
-    plot(centers(i,1),centers(i,2),'r+');
-end
-hold off;
-
-
+[stack, maxIntensity] = getStackFromFile(filePath);
+I = stack(:,1:240,1);
 
 %%
-dist1 = 0;
-dist2 = 0;
 
-for renner=1:1000
-I = zeros(51,'uint16');
-Intensities = uint16(rand(10,1) * 0.25*2^16 + 0.5*2^16);
-Widths = randn(10,1)/4 + 1;
-Widths(Widths<0) = 0;
-Posx = rand(10,1)*51;
-Posy = rand(10,1)*51;
+f = figure(1);
 
-for i=1:10    
-    Zeros = zeros(51,'uint16');
-    while max(Zeros(:)) < Intensities(i)
-        R = mvnrnd([Posx(i), Posy(i)], [Widths(i),Widths(i)], 1000);
-        [N,Xedges,Yedges] = histcounts2(R(:,1),R(:,2),0:51,0:51);
-        Zeros = uint16(N) + Zeros;
-    end
-    I = I + Zeros;
-end
-
-Posx = Posx + .5;
-Posy = Posy + .5;
-
-I = imnoise(I,'gaussian',.01);
-I = imnoise(I,'poisson');
-I = imadjust(I);
-
-figure(3)
-imshow(I);
-
-hold on;
-for i=1:size(Posy,1)
-    plot(Posy(i),Posx(i),'g+');
-end
-hold off;
-
-J = imadjust(imgaussfilt(I,.5));
+J = imgaussfilt(I, 1);
 BW = imregionalmax(J);
-stats = regionprops('Table',BW,J,'MeanIntensity','Centroid');
-selectedIdx = stats.MeanIntensity > .8*2^16;
-selectedIdx = find(selectedIdx);
-L = bwlabel(BW);
-K = BW.*0;
-for i=1:size(selectedIdx,1)
-    K = K + (L==selectedIdx(i));
-end
 
-hold on;
-for i=1:size(selectedIdx,1)
-    center = stats(selectedIdx(i),:).Centroid;
-    plot(center(1),center(2),'r+');
-end
-hold off;
+imshowpair(imadjust(J),BW,'montage')
 
-centers = stats(selectedIdx(:),:).Centroid;
+%%
+clc;
 
-dist1x = min(abs( repmat(centers(:,2),1,size(Posx,1)) - repmat(Posx,1,size(centers,1))' ));
-dist1y = min(abs( repmat(centers(:,1),1,size(Posy,1)) - repmat(Posy,1,size(centers,1))' ));
-dist1 = sum(sqrt(dist1x.^2 + dist1y.^2)) + dist1;
+[X,Y] = meshgrid((1:50),(1:50));
+cf = @(x,y,ux,uy,s,A,B) A * ( (1-B)*(exp(((x-ux).^2 + (y-uy).^2) / (-2*s)) / (2*pi*s)) + B/size(x(:),1) );
 
-centers = findParticles(I,0.8*2^16,1.0*2^16,0.5,'Method','GaussianFit');
-centers = centers{1}.Center;
-hold on;
-for i=1:size(centers,1)
-    plot(centers(i,1),centers(i,2),'b+');
-end
-hold off;
+act_ux = 30;
+act_uy = 20;
+act_s  = 10;
+act_A  = 1;
+act_B  = 0;
+
+data = cf(X, Y, act_ux, act_uy, act_s, act_A, act_B);
+
+f = figure(1);
+surf(data)
+
+numT    = size(data(:),1);
+dataT   = sum(data(:))
+
+est_ux  = mean(data(:).*X(:))/dataT*numT;
+est_uy  = mean(data(:).*Y(:))/dataT*numT;
+est_s   = sum( ((X(:) - est_ux).^2 + (Y(:) - est_uy).^2).*data(:) ) / (dataT*2);
+est_A  = dataT;
+
+est_B  = mean(data(:));
 
 
-dist2x = min(abs( repmat(centers(:,2),1,size(Posx,1)) - repmat(Posx,1,size(centers,1))' ));
-dist2y = min(abs( repmat(centers(:,1),1,size(Posy,1)) - repmat(Posy,1,size(centers,1))' ));
-dist2 = sum(sqrt(dist2x.^2 + dist2y.^2)) + dist2;
-end
+[est_ux est_uy est_s est_A est_B]
 
-dist1 = dist1/10
-dist2 = dist2/10

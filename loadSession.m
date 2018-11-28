@@ -52,6 +52,9 @@ function flag = loadSession(hObject)
     if ~isfield(session,'tra_DAScaleAuto')
         session.tra_DAScaleAuto = 1;
     end
+    if ~isfield(session,'fret_width')
+        session.fret_width = 5;
+    end
     
     
     %% Setup general variables
