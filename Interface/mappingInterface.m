@@ -793,11 +793,10 @@ function updateDisplay(hObject,handles,particleFlag)
                 if filterSize > 0.1
                     I = imgaussfilt(I, filterSize);
                 end
-                I = imadjust(I);
-                handles.multiAxes.AxesAPI{i}.replaceImage(I,'PreserveView',true);
+                handles.multiAxes.AxesAPI{i}.replaceImage(imadjust(I),'PreserveView',true);
                 
                 
-                particles = findParticles(I, particleMinInt, particleMaxInt);
+                particles = findParticles(I, particleMinInt, particleMaxInt, filterSize);
                 centers = particles{1};
                 
                 

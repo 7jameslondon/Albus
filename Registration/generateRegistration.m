@@ -10,15 +10,23 @@ function generateRegistration(hObject,handles)
     colors = getappdata(handles.f,'colors');
     invertImage = handles.map.invertCheckbox.Value;
     numChannels = size(seperatedStacks,1);
+    timeAvg = handles.map.timeAvgCheckbox.Value;
+    
+    
     
     displacmentFields = cell(numChannels,1); % pre-aloc
     
     %% Find the postition of the particles in the first channel
-    I = seperatedStacks{1}(:,:,currentFrame);
+    if timeAvg
+        I = timeAvgStack(seperatedStacks{1});
+    else
+        I = seperatedStacks{1}(:,:,currentFrame);
+    end
     % invert
     if invertImage
         I = imcomplement(I);
     end
+    I = imadjust(I);
     % this will  filter and adjust brightness as needed
     particles = findParticles(I, ...
                         particleSettings(1).minIntensity, ...
@@ -34,11 +42,16 @@ function generateRegistration(hObject,handles)
     for s = 2:numChannels % no parfor as findParticles has parfor
         
         %% Find particle positions in each channel
-        I = seperatedStacks{s}(:,:,currentFrame);
+        if timeAvg
+            I = timeAvgStack(seperatedStacks{s});
+        else
+            I = seperatedStacks{s}(:,:,currentFrame);
+        end
         % invert
         if invertImage
             I = imcomplement(I);
         end
+        I = imadjust(I);
         % this will  filter and adjust brightness as needed
         particles = findParticles(I, ...
                             particleSettings(s).minIntensity, ...
