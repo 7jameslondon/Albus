@@ -2,7 +2,7 @@ function dwellTimes = FRETDwellTimes(traces)
     numTraces   = size(traces,1);
     dwellTimes  = cell(1,1);
     
-    traces(isnan(traces)) = 0;
+    traces(traces 
     
     for i = 1:numTraces
         trace = traces(i,:);

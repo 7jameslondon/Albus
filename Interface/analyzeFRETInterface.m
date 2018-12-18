@@ -14,8 +14,8 @@ function handles = createInterface(handles)
     setappdata(handles.f,'traces',traces);
     setappdata(handles.f,'trace_currentTrace',1);
     setappdata(handles.f,'trace_mode','default');
-    setappdata(handles.f,'trace_donorBGRule','');
-    setappdata(handles.f,'trace_acceptorBGRule','');
+    setappdata(handles.f,'trace_donorBGRule','min(traces.Donor_hmm(:,x),[],2)');
+    setappdata(handles.f,'trace_acceptorBGRule','min(traces.Acceptor_hmm(:,x),[],2)');
     
     handles.tra.leftPanel = uix.VBox( 'Parent', handles.leftPanel);
     
@@ -683,6 +683,11 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
             
             setScale(hObject,lowDA,highDA);
         end
+        
+        %% Update pre-calculated
+        if ~any(~traces.Calculated) % all traces are calculated
+            handles.tra.preCalButton.Enable = 'off';
+        end
     end
 end
 
@@ -703,6 +708,10 @@ function setBGRule(hObject,handles)
     
      % evluate prompt
     traces = getappdata(handles.f,'traces');
+    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    x = (startT:endT);
+    
     if ~isempty(rule)
         try
             results = eval(rule);
@@ -1105,7 +1114,8 @@ function preCalculateAllTraces(hObject, handles)
     setappdata(handles.f,'traces',traces);
 end
 
-function trace = calculateTraceData(trace, movMeanWidth, x, minStates, maxStates, donorScale, acceptorScale, donorBGRule, acceptorBGRule)
+function trace = calculateTraceData(trace, movMeanWidth, x, minStates,...
+                    maxStates, donorScale, acceptorScale, donorBGRule, acceptorBGRule)
     % Get original traces
     Donor       = movmean(trace.Donor_raw(1,x), movMeanWidth);
     Acceptor    = movmean(trace.Acceptor_raw(1,x), movMeanWidth);
@@ -1126,8 +1136,10 @@ function trace = calculateTraceData(trace, movMeanWidth, x, minStates, maxStates
     % Fret
     trace.FRET(1,x)            = trace.Acceptor(1,x) ./ (trace.Acceptor(1,x) + trace.Donor(1,x));
     noFRETInd                  = (trace.Donor_hmm(1,:)==0 | trace.Acceptor_hmm(1,:)==0);
-    trace.FRET(noFRETInd)      = 0;
+    trace.FRET(noFRETInd)      = 0; % NaN cant be sent to vbFRET
     trace.FRET_hmm(1,x)        = vbFRETWrapper(trace.FRET(1,x), minStates, maxStates);
+    trace.FRET(noFRETInd)      = NaN; 
+    trace.FRET_hmm(noFRETInd)  = NaN; 
     % Calculated
     trace.Calculated(1) = true;
 end
@@ -1687,7 +1699,7 @@ function displayDwellTimes(hObject, handles)
     
     % calculate all the cross-correlations
     FRETDT      = FRETDwellTimes(fret);
-    FRETDT      = frameRate * FRETDT;
+    FRETDT      = cellfun(@(s) s*frameRate,FRETDT,'UniformOutput',false);
     
     %% Display
     % plot the correlations
