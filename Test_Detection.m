@@ -1,5 +1,5 @@
 %% Setup/Import
-mpath = fileparts(which(mfilename));
+mpath = ['/Users/jameslondon/Documents/Fishel Lab/Albus'];
 addpath([mpath '/Registration']);
 addpath([mpath '/Interface']);
 addpath([mpath '/Tracking']);
@@ -18,41 +18,60 @@ filePath = ['/Users/jameslondon/Documents/Fishel Lab/JL Nature Data/2016-',...
 I = stack(:,1:240,1);
 
 %%
+sizeP = 5;
+minI = 2000;
+
+particles = MLDetector(I,minI,sizeP,'MLE Full')
+J = imgaussfilt(I, sizeP/5);
+
+rgb = [particles.L]';
+rgb = rgb - min(rgb);
+rgb = rgb / max(rgb);
+rgb = ind2rgb(uint8(round(rgb*256)),parula(256));
+rgb = permute(double(rgb),[1 3 2]);
 
 f = figure(1);
+imshow(imadjust(imcomplement(I)));
 
-J = imgaussfilt(I, 1);
-BW = imregionalmax(J);
+hold on;
+if ~isempty(particles)
+    for i = 1:size(particles,2)
+        viscircles([particles(i).ux particles(i).uy], particles(i).s,'Color',rgb(i,:));
+        %viscircles([particles(i).ux particles(i).uy], 5);
+    end
+end
 
-imshowpair(imadjust(J),BW,'montage')
+hold off;
+
+%%
+subplot(2,1,2);
+histogram(J(:));
 
 %%
 clc;
 
-[X,Y] = meshgrid((1:50),(1:50));
-cf = @(x,y,ux,uy,s,A,B) A * ( (1-B)*(exp(((x-ux).^2 + (y-uy).^2) / (-2*s)) / (2*pi*s)) + B/size(x(:),1) );
+[X,Y] = meshgrid((1:50),(1:60));
+cf = @(x,y,ux,uy,s,A,B)  A * exp(((x-ux).^2 + (y-uy).^2) / (-2*s)) / (2*pi*s) + B ;
 
 act_ux = 30;
 act_uy = 20;
-act_s  = 10;
-act_A  = 1;
-act_B  = 0;
+act_s  = 5;
+act_A  = 20000;
+act_B  = 10;
 
-data = cf(X, Y, act_ux, act_uy, act_s, act_A, act_B);
-
+%data = cf(X, Y, act_ux, act_uy, act_s, act_A, act_B) + .002*2*rand(size(X)) - .002;
+data = cf(X, Y, 30, 20, act_s, act_A, act_B) ...
+     + cf(X, Y, 30, 25, act_s, act_A, act_B) ...
+     + rand(size(X));
+ 
+ data = round(data);
+ 
 f = figure(1);
-surf(data)
+ax = axes('parent',f);
+imagesc(data);
 
-numT    = size(data(:),1);
-dataT   = sum(data(:))
+sizeP = 10;
+minI = 200;
+particles = MLDetector(data,minI,sizeP,false,false);
 
-est_ux  = mean(data(:).*X(:))/dataT*numT;
-est_uy  = mean(data(:).*Y(:))/dataT*numT;
-est_s   = sum( ((X(:) - est_ux).^2 + (Y(:) - est_uy).^2).*data(:) ) / (dataT*2);
-est_A  = dataT;
-
-est_B  = mean(data(:));
-
-
-[est_ux est_uy est_s est_A est_B]
-
+viscircles(ax, [[particles.ux]' [particles.uy]'], [particles.s]');

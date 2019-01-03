@@ -658,10 +658,11 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         axis(handles.tra.FRETAxes, [startT, endT, -0.05, 1.05]);
         
         % Centers
-        cor = FRETCorr(traces.Donor(c,x), traces.Acceptor(c,x));
-        handles.tra.ColocalizationPlot.XData    = 1:size(cor,2);
+        cor = traces.Acceptor(c,x) .* traces.Donor(c,x) ...
+            / ( traces.Acceptor(c,x)) + sum(traces.Donor(c,x)) );
+        handles.tra.ColocalizationPlot.XData    = x;
         handles.tra.ColocalizationPlot.YData    = cor; % traces.DADistance(c,x);
-        axis(handles.tra.PosAxes,'auto')
+        axis(handles.tra.PosAxes, [startT, endT, 0, max(cor)*1.05]);
         
         % Video peak circle
         if isappdata(handles.f,'data_trace_plt')
@@ -1697,27 +1698,31 @@ function displayCorrelation(hObject, handles)
     ax = axes(f);
 
     ax1 = subplot(2, 2, 1, ax); % 
-    plot(ax1, DACorr);
+    plot(ax1, 1:length(DACorr), DACorr);
     hold on;
     title(ax1, "Donor-Acceptor Cross-correlation");
+    xlim([1,length(DACorr)]);
     hold off;
 
     ax2 = subplot(2, 2, 2); % 
-    plot(ax2, DAutoCorr);
+    plot(ax2, 1:length(DAutoCorr), DAutoCorr);
     hold on;
     title(ax2, "Donor Auto-correlation");
+    xlim([0,length(DAutoCorr)]);
     hold off;
     
     ax3 = subplot(2, 2, 3); % 
-    plot(ax3, AAutoCorr);
+    plot(ax3, 1:length(AAutoCorr), AAutoCorr);
     hold on;
     title(ax3, "Acceptor Auto-correlation");
+    xlim([0,length(AAutoCorr)]);
     hold off;
     
     ax4 = subplot(2, 2, 4); % 
-    plot(ax4, FAutoCorr);
+    plot(ax4, 1:length(FAutoCorr), FAutoCorr);
     hold on;
     title(ax4, "FRET Auto-correlation");
+    xlim([0,length(FAutoCorr)]);
     hold off;
 end
 
