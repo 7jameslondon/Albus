@@ -56,7 +56,11 @@ function handles = createInterface(handles)
                                             'String', '2',...
                                             'Style', 'edit',...
                                             'Callback', @(hObject,~) setHighCut(hObject));
-    handles.tra.cutBox.set('Widths',[30, -1, 30]);
+    handles.tra.allCut = uicontrol(  'Parent', handles.tra.cutBox,...
+                                            'String', 'All',...
+                                            'Style', 'pushbutton',...
+                                            'Callback', @(hObject,~) setAllCut(hObject));
+    handles.tra.cutBox.set('Widths',[30, -1, 30, 30]);
                                         
     % moving mean
     uicontrol( 'Parent', handles.tra.settingsBox,...
@@ -73,12 +77,41 @@ function handles = createInterface(handles)
     handles.tra.meanSlider.JavaPeer.set('Minimum', 1);
     handles.tra.meanSlider.JavaPeer.set('Value', 1);
     handles.tra.meanSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setMean_Slider(handles.tra.meanSlider));
-    handles.tra.meanBox.set('Widths',[30, -1]);
+    handles.tra.allMean = uicontrol(  'Parent', handles.tra.meanBox,...
+                                            'String', 'All',...
+                                            'Style', 'pushbutton',...
+                                            'Callback', @(hObject,~) setAllMean(hObject));
+    handles.tra.meanBox.set('Widths',[30, -1, 30]);
     
     % remove background
-    handles.tra.setBGRuleButton = uicontrol(   'Parent', handles.tra.settingsBox,...
-                                                'String', 'Set Background Rule',...
-                                                'Callback', @(hObject,~) setBGRule(hObject,guidata(hObject)));
+    uicontrol( 'Parent', handles.tra.settingsBox,...
+               'Style' , 'text', ...
+               'String', 'Background');
+    handles.tra.DABGBox = uix.HBox('Parent', handles.tra.settingsBox);
+    uicontrol(                                  'Parent', handles.tra.DABGBox,...
+                                                'String', 'Donor',...
+                                                'Style', 'text');
+    handles.tra.setDonorBGTextBox = uicontrol(  'Parent', handles.tra.DABGBox,...
+                                                'Style', 'edit',...
+                                                'String', '0',...
+                                                'Callback', @(hObject,~) setDonorBG(hObject,guidata(hObject)));
+    uicontrol(                                  'Parent', handles.tra.DABGBox,...
+                                                'String', 'Acceptor',...
+                                                'Style', 'text');
+    handles.tra.setAcceptorBGTextBox = uicontrol('Parent', handles.tra.DABGBox,...
+                                                'Style', 'edit',...
+                                                'String', '0',...
+                                                'Callback', @(hObject,~) setAcceptorBG(hObject,guidata(hObject)));
+    handles.tra.DABGBox.set('Widths',[60, 60, 60, 60]);
+    
+    handles.tra.ButtonBGBox = uix.HButtonBox(   'Parent', handles.tra.settingsBox,'ButtonSize',[50, 20]);
+    handles.tra.autoBGButton = uicontrol(       'Parent', handles.tra.ButtonBGBox,...
+                                                'String', 'Auto',...
+                                                'Callback', @(hObject,~) autoBG(hObject,guidata(hObject)));
+    uix.Empty('Parent', handles.tra.ButtonBGBox);
+    handles.tra.allAutoBGButton = uicontrol(    'Parent', handles.tra.ButtonBGBox,...
+                                                'String', 'All',...
+                                                'Callback', @(hObject,~) allAutoBG(hObject,guidata(hObject)));
                                             
     % Frame Rate
     handles.tra.frameRateBox = uix.HBox('Parent', handles.tra.settingsBox);
@@ -90,7 +123,7 @@ function handles = createInterface(handles)
                                             'Style', 'edit',...
                                             'Callback', @(hObject,~) updateDisplay(hObject,guidata(hObject)));
                                             
-    handles.tra.settingsBox.set('Heights',[25,20,20,20,20,30,25]);
+    handles.tra.settingsBox.set('Heights',[25,20,20,20,20,20,20,30,25]);
                                     
     %% selection
     handles.tra.selectionPanel = uix.BoxPanel(  'Parent', handles.tra.leftPanel,...
@@ -153,7 +186,11 @@ function handles = createInterface(handles)
                                                     'String', '1',...
                                                     'Style', 'edit',...
                                                     'Callback', @(hObject,~) setHMMStates_HighTextBox(hObject));
-    handles.tra.hmmStatesBox.set('Widths',[30, -1, 30]);
+    handles.tra.allHMM = uicontrol( 'Parent', handles.tra.hmmStatesBox,...
+                                    'String', 'All',...
+                                    'Style', 'pushbutton',...
+                                    'Callback', @(hObject,~) setAllHMM(hObject));
+    handles.tra.hmmStatesBox.set('Widths',[30, -1, 30, 30]);
     
     %% Grouping
     handles.tra.group = struct();
@@ -235,7 +272,7 @@ function handles = createInterface(handles)
                                             'Callback', @(hObject,~) exportAnalysis(hObject,guidata(hObject)));
                            
     %% 
-    handles.tra.leftPanel.set('Heights',[25 200 110 75 203 100]);
+    handles.tra.leftPanel.set('Heights',[25 250 110 75 203 100]);
     
     
     %% Right panel
@@ -291,37 +328,37 @@ function handles = createInterface(handles)
     % grid
     handles.tra.graphGrid = uix.GridFlex('Parent', handles.tra.graphPanel, 'Spacing', 5);
     
-    handles.tra.DAScaleBox = uix.VBox('Parent', handles.tra.graphGrid);
-    
-    uicontrol('Parent', handles.tra.DAScaleBox,...
-              'String', 'Auto',...
-              'Style', 'text');
-    
-    handles.tra.DAScaleAuto = uicontrol('Parent', handles.tra.DAScaleBox,...
-                                        'String', '',...
-                                        'Style', 'Checkbox',...
-                                        'Value', 1,...
-                                        'Callback', @(hObject,~) updateDisplay(hObject,guidata(hObject)) );
-    
-    [~, handles.tra.DAScale] = javacomponent('com.jidesoft.swing.RangeSlider');
-    handles.tra.DAScale.set('Parent', handles.tra.DAScaleBox);
-    handles.tra.DAScale.JavaPeer.set('Maximum', 11e6);
-    handles.tra.DAScale.JavaPeer.set('Minimum', 0);
-    handles.tra.DAScale.JavaPeer.set('LowValue', 0);
-    handles.tra.DAScale.JavaPeer.set('HighValue', 11e6);
-    handles.tra.DAScale.JavaPeer.set('StateChangedCallback', @(~,~) setScale(handles.tra.DAScale,...
-        handles.tra.DAScale.JavaPeer.get('LowValue')/handles.tra.DAScale.JavaPeer.get('Maximum')*11,...
-        handles.tra.DAScale.JavaPeer.get('HighValue')/handles.tra.DAScale.JavaPeer.get('Maximum')*11));
-    handles.tra.DAScale.JavaPeer.set('Orientation',handles.tra.DAScale.JavaPeer.VERTICAL);
-    
-    handles.tra.DAScaleBox.set('Heights',[15 15 -1]);
-    
-    uix.Empty('Parent', handles.tra.graphGrid);
-    uix.Empty('Parent', handles.tra.graphGrid);
+%     handles.tra.DAScaleBox = uix.VBox('Parent', handles.tra.graphGrid);
+%     
+%     uicontrol('Parent', handles.tra.DAScaleBox,...
+%               'String', 'Auto',...
+%               'Style', 'text');
+%     
+%     handles.tra.DAScaleAuto = uicontrol('Parent', handles.tra.DAScaleBox,...
+%                                         'String', '',...
+%                                         'Style', 'Checkbox',...
+%                                         'Value', 1,...
+%                                         'Callback', @(hObject,~) updateDisplay(hObject,guidata(hObject)) );
+%     
+%     [~, handles.tra.DAScale] = javacomponent('com.jidesoft.swing.RangeSlider');
+%     handles.tra.DAScale.set('Parent', handles.tra.DAScaleBox);
+%     handles.tra.DAScale.JavaPeer.set('Maximum', 11e6*2^16);
+%     handles.tra.DAScale.JavaPeer.set('Minimum', 0);
+%     handles.tra.DAScale.JavaPeer.set('LowValue', 0);
+%     handles.tra.DAScale.JavaPeer.set('HighValue', 11e6*2^16);
+%     handles.tra.DAScale.JavaPeer.set('StateChangedCallback', @(~,~) setScale(handles.tra.DAScale,...
+%         handles.tra.DAScale.JavaPeer.get('LowValue')/handles.tra.DAScale.JavaPeer.get('Maximum')*11,...
+%         handles.tra.DAScale.JavaPeer.get('HighValue')/handles.tra.DAScale.JavaPeer.get('Maximum')*11));
+%     handles.tra.DAScale.JavaPeer.set('Orientation',handles.tra.DAScale.JavaPeer.VERTICAL);
+%     
+%     handles.tra.DAScaleBox.set('Heights',[15 15 -1]);
+%     
+%     uix.Empty('Parent', handles.tra.graphGrid);
+%     uix.Empty('Parent', handles.tra.graphGrid);
     handles.tra.DAAxes              = axes(handles.tra.graphGrid);
     handles.tra.FRETAxes            = axes(handles.tra.graphGrid);
     handles.tra.PosAxes             = axes(handles.tra.graphGrid);
-    handles.tra.graphGrid.set('Widths',[30 -1],'Heights',[-1 -1 -1]);
+    handles.tra.graphGrid.set('Widths',-1,'Heights',[-2 -2 -1]);
     
     % plots
     handles.tra.DonorPlot           = plot(handles.tra.DAAxes, 1, '-');
@@ -333,8 +370,8 @@ function handles = createInterface(handles)
     
     handles.tra.DonorPlot.LineWidth         = 2;
     handles.tra.AcceptorPlot.LineWidth      = 2;
-    handles.tra.DonorStatePlot.LineWidth    = 2;
-    handles.tra.AcceptorStatePlot.LineWidth = 2;
+    handles.tra.DonorStatePlot.LineWidth    = 1;
+    handles.tra.AcceptorStatePlot.LineWidth = 1;
     
     handles.tra.DonorPlot.Color         = [10, 50, 0]/100;
     handles.tra.AcceptorPlot.Color      = [75, 15, 0]/100;
@@ -407,8 +444,8 @@ function handles = loadFromSession(hObject,handles,session)
     set(handles.tra.hmmStatesHighTextBox, 'String', num2str(session.tra_highStates));
         
     handles.tra.DAScaleAuto.Value = session.tra_DAScaleAuto;
-    set(handles.tra.DAScale.JavaPeer, 'LowValue', session.tra_DAScale(1));
-    set(handles.tra.DAScale.JavaPeer, 'HighValue', session.tra_DAScale(2));
+%     set(handles.tra.DAScale.JavaPeer, 'LowValue', session.tra_DAScale(1));
+%     set(handles.tra.DAScale.JavaPeer, 'HighValue', session.tra_DAScale(2));
     
     handles.tra.playSpeed.String = num2str(session.playSpeed);
     
@@ -488,11 +525,11 @@ function onDisplay(hObject,handles,loadingSession)
     setTrace(hObject,handles,1);
     setCut(hObject);
     setVidCurrentFrame(hObject, getappdata(handles.f,'home_currentFrame'));
-    setScale(hObject, ...
-        handles.tra.DAScale.JavaPeer.get('LowValue') / ...
-        handles.tra.DAScale.JavaPeer.get('Maximum')*11, ...
-        handles.tra.DAScale.JavaPeer.get('HighValue') / ...
-        handles.tra.DAScale.JavaPeer.get('Maximum')*11)
+%     setScale(hObject, ...
+%         handles.tra.DAScale.JavaPeer.get('LowValue') / ...
+%         handles.tra.DAScale.JavaPeer.get('Maximum')*11, ...
+%         handles.tra.DAScale.JavaPeer.get('HighValue') / ...
+%         handles.tra.DAScale.JavaPeer.get('Maximum')*11)
     ax = axis(handles.tra.DAAxes);
     axis(handles.tra.DAAxes, [1, vidMax, ax(3), ax(4)]);
     
@@ -515,7 +552,10 @@ function onRelease(hObject,handles)
     
     % remove groups
     handles.tra.skipHiddenGroups.Value = 0;
-    delete(handles.tra.group.grid.Children(7:size(handles.tra.group.grid.Children,1)));
+    numInGrid = size(handles.tra.group.grid.Children,1);
+    delete(handles.tra.group.grid.Children(1:numInGrid-6));
+    handles.tra.group.grid.set('Widths',[-1 -1 -1 -1 -1 -1]);
+    handles.tra.group.grid.set('Heights',25);
     setappdata(handles.f,'trace_groupHandles',cell(0,6));
     
     homeInterface('openSelectFRET',hObject);
@@ -547,8 +587,9 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         
         %% Get required data
         c = getappdata(handles.f,'trace_currentTrace');
-        startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
-        endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
+        startT = traces.LowCut(c);
+        endT = traces.HighCut(c);
+        movMeanWidth = traces.MovingMeanWidth(c);
         x = (startT:endT);
         shownTraceIdx = getShownTraces(hObject, handles);
         
@@ -590,45 +631,38 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         if ~traces.Calculated(c)
             hWaitBar = waitbar(0,'loading...', 'WindowStyle', 'modal');
             
-            movMeanWidth    = handles.tra.meanSlider.JavaPeer.get('Value');
-            minStates       = handles.tra.hmmStatesSlider.JavaPeer.get('LowValue');
-            maxStates       = handles.tra.hmmStatesSlider.JavaPeer.get('HighValue');
-            
             donorLimits     = getappdata(handles.f,'donorLimits');
             acceptorLimits  = getappdata(handles.f,'acceptorLimits');
-            
-            donorBGRule = getappdata(handles.f,'trace_donorBGRule');
-            if isempty(donorBGRule)
-                donorBGRule = '0';
-            else
-                try
-                    temp = eval(donorBGRule);
-                catch
-                    donorBGRule = '0';
-                end
-            end
-            
-            acceptorBGRule = getappdata(handles.f,'trace_acceptorBGRule');
-            if isempty(acceptorBGRule)
-                acceptorBGRule = '0';
-            else
-                try
-                    temp = eval(acceptorBGRule);
-                catch
-                    acceptorBGRule = '0';
-                end
-            end
-            
             if isempty(donorLimits)
                 return;
             end
-            
                 
-            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2),donorBGRule,acceptorBGRule);
+            traces(c,:) = calculateTraceData(traces(c,:), donorLimits(2), acceptorLimits(2));
             setappdata(handles.f,'traces',traces); % save
             
             delete(hWaitBar);
         end
+        
+        % Backgrounds
+        handles.tra.setDonorBGTextBox.String = num2str(traces.Donor_bg(c));
+        handles.tra.setAcceptorBGTextBox.String = num2str(traces.Acceptor_bg(c));
+        
+        % Cutting        
+        handles.tra.cutSlider.JavaPeer.set('LowValue', startT);
+        handles.tra.lowCutTextBox.set('String', num2str(startT));
+        
+        handles.tra.cutSlider.JavaPeer.set('HighValue', endT);
+        handles.tra.highCutTextBox.set('String', num2str(endT));
+        
+        % Moving Mean
+        handles.tra.meanSlider.JavaPeer.set('Value', movMeanWidth);
+        handles.tra.meanTextBox.set('String', num2str(movMeanWidth));
+        
+        % HMM Controls
+        handles.tra.hmmStatesLowTextBox.set('String',num2str(traces.MinHMM(c)));
+        handles.tra.hmmStatesSlider.JavaPeer.set('LowValue',traces.MinHMM(c));
+        handles.tra.hmmStatesHighTextBox.set('String',num2str(traces.MaxHMM(c)));
+        handles.tra.hmmStatesSlider.JavaPeer.set('HighValue',traces.MaxHMM(c));
         
         % Frame rate adjustment for all plots
         frameRate = str2double(handles.tra.frameRate.String);
@@ -649,6 +683,9 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         handles.tra.AcceptorPlot.YData      = traces.Acceptor(c,x);
         handles.tra.AcceptorStatePlot.XData = x;
         handles.tra.AcceptorStatePlot.YData = traces.Acceptor_hmm(c,x);
+        
+        ax = axis(handles.tra.DAAxes);
+        axis(handles.tra.DAAxes, [startT, endT, ax(3), ax(4)]);
 
         % FRET Trace
         handles.tra.FRETPlot.XData          = x;
@@ -661,7 +698,7 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         cor = FRETCorr(traces.Donor(c,x), traces.Acceptor(c,x));
         handles.tra.ColocalizationPlot.XData    = 1:size(cor,2);
         handles.tra.ColocalizationPlot.YData    = cor; % traces.DADistance(c,x);
-        axis(handles.tra.PosAxes,'auto')
+        axis(handles.tra.PosAxes,'auto');
         
         % Video peak circle
         if isappdata(handles.f,'data_trace_plt')
@@ -675,20 +712,23 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         handles.tra.vidAxesAPI.setMagnificationAndCenter(mag,traces.Center(c,1),traces.Center(c,2)); % center video scroll on current peak
                 
         %% Auto scale axes if applicable
-        if handles.tra.DAScaleAuto.Value
-            lowDAV = min([traces.Donor(c,x), traces.Acceptor(c,x)])  * 0.9;
-            highDAV = max([traces.Donor(c,x), traces.Acceptor(c,x)]) * 1.1;
-            
-            highscalefix = 11-log10(1.1); % ensures max highvalue gives a scale of 1.1
-            highDA = log10(highDAV)+highscalefix;
-            lowDA  = (lowDAV*10/highDAV)+1;
-            
-            handles.tra.DAScale.JavaPeer.set('LowValue',lowDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11);
-            handles.tra.DAScale.JavaPeer.set('HighValue',highDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11);
-            handles.tra.DAScale.JavaPeer.set('LowValue',lowDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11); % do it twise incase high is initaly lower
-            
-            setScale(hObject,lowDA,highDA);
-        end
+%         if handles.tra.DAScaleAuto.Value
+%             lowDAV = min([traces.Donor(c,x), traces.Acceptor(c,x)])  * 0.9;
+%             highDAV = max([traces.Donor(c,x), traces.Acceptor(c,x)]) * 1.1;
+%             
+%             highscalefix = 11-log10(1.1); % ensures max highvalue gives a scale of 1.1
+%             highDA = log10(highDAV)+highscalefix;
+%             lowDA  = (lowDAV*10/highDAV)+1;
+%             
+%             handles.tra.DAScale.JavaPeer.set('LowValue',lowDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11);
+%             handles.tra.DAScale.JavaPeer.set('HighValue',highDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11);
+%             handles.tra.DAScale.JavaPeer.set('LowValue',lowDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11); % do it twise incase high is initaly lower
+%             
+%             setScale(hObject,lowDA,highDA);
+%         end
+        axis(handles.tra.DAAxes,'auto');
+        ax = axis(handles.tra.DAAxes);
+        axis(handles.tra.DAAxes, [startT, endT, ax(3), ax(4)]);
                 
         %% Update pre-calcualtion button
         if any(~traces(shownTraceIdx,:).Calculated)
@@ -696,6 +736,10 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         else
             handles.tra.preCalButton.Enable = 'off';
         end
+        
+        xticklabels(handles.tra.DAAxes,'auto')
+        xticklabels(handles.tra.FRETAxes,'auto')
+        xticklabels(handles.tra.PosAxes,'auto')
     end
 end
 
@@ -1073,44 +1117,16 @@ function preCalculateAllTraces(hObject, handles)
     % Get data
     shownTraceIdx   = getShownTraces(hObject, handles);
     traces          = getappdata(handles.f,'traces');
-    movMeanWidth    = handles.tra.meanSlider.JavaPeer.get('Value');
-    startT          = handles.tra.cutSlider.JavaPeer.get('LowValue');
-    endT            = handles.tra.cutSlider.JavaPeer.get('HighValue');
-    x               = (startT:endT);
     numTraces       = size(traces,1);
-    minStates       = handles.tra.hmmStatesSlider.JavaPeer.get('LowValue');
-    maxStates       = handles.tra.hmmStatesSlider.JavaPeer.get('HighValue');
     donorLimits     = getappdata(handles.f,'donorLimits');
     acceptorLimits  = getappdata(handles.f,'acceptorLimits');
-    
-    donorBGRule = getappdata(handles.f,'trace_donorBGRule');
-    if isempty(donorBGRule)
-        donorBGRule = '0';
-    else
-        try
-            temp = eval(donorBGRule);
-        catch
-            donorBGRule = '0';
-        end
-    end
-
-    acceptorBGRule = getappdata(handles.f,'trace_acceptorBGRule');
-    if isempty(acceptorBGRule)
-        acceptorBGRule = '0';
-    else
-        try
-            temp = eval(acceptorBGRule);
-        catch
-            acceptorBGRule = '0';
-        end
-    end
     
     % run calcualtions
     uncalculatedTraces = ~traces.Calculated & shownTraceIdx;
     parWaitbar('start', 'Calculating parameters for traces', numTraces);
     parfor c=1:numTraces
         if uncalculatedTraces(c)
-            traces(c,:) = calculateTraceData(traces(c,:), movMeanWidth, x, minStates, maxStates, donorLimits(2), acceptorLimits(2),donorBGRule,acceptorBGRule);
+            traces(c,:) = calculateTraceData(traces(c,:), donorLimits(2), acceptorLimits(2));
         end
         
         parWaitbar;
@@ -1123,10 +1139,16 @@ function preCalculateAllTraces(hObject, handles)
     setappdata(handles.f,'traces',traces);
 end
 
-function trace = calculateTraceData(trace, movMeanWidth, x, minStates,...
-                    maxStates, donorScale, acceptorScale, donorBGRule, acceptorBGRule)
+function trace = calculateTraceData(trace, donorScale, acceptorScale)
                 
-   HMM = true;
+    movMeanWidth    = trace.MovingMeanWidth;
+    startT          = trace.LowCut;
+    endT            = trace.HighCut;
+    x               = (startT:endT);
+    minStates       = trace.MinHMM;
+    maxStates       = trace.MaxHMM;
+                
+    HMM = true;
     if minStates == 1 && maxStates  == 1
         HMM = false;
     end
@@ -1141,24 +1163,33 @@ function trace = calculateTraceData(trace, movMeanWidth, x, minStates,...
         trace.Acceptor_hmm(1,x)    = vbFRETWrapper(Acceptor/acceptorScale, minStates, maxStates) * acceptorScale;
         
         % Background
-        traces = trace; % this is nessasry for the following eval
-        trace.Donor_bg(1)          = eval(donorBGRule);
-        trace.Acceptor_bg(1)       = eval(acceptorBGRule);
+        if isnan(trace.Donor_bg)
+            trace.Donor_bg         = min(trace.Donor_hmm(1,x));
+        end
         
-        trace.Donor_hmm(1,x)       = trace.Donor_hmm(1,x) - trace.Donor_bg(1);
-        trace.Acceptor_hmm(1,x)    = trace.Acceptor_hmm(1,x) - trace.Acceptor_bg(1);
+        if isnan(trace.Acceptor_bg)
+            trace.Acceptor_bg      = min(trace.Acceptor_hmm(1,x));
+        end
+                
+        trace.Donor_hmm(1,x)       = trace.Donor_hmm(1,x) - trace.Donor_bg;
+        trace.Acceptor_hmm(1,x)    = trace.Acceptor_hmm(1,x) - trace.Acceptor_bg;
         
-        trace.Donor(1,x)           = Donor - trace.Donor_bg(1);
-        trace.Acceptor(1,x)        = Acceptor - trace.Acceptor_bg(1);
+        trace.Donor(1,x)           = Donor - trace.Donor_bg;
+        trace.Acceptor(1,x)        = Acceptor - trace.Acceptor_bg;
     else
+        if isnan(trace.Donor_bg)
+            trace.Donor_bg         = min(Donor);
+        end
+        
+        if isnan(trace.Acceptor_bg)
+            trace.Acceptor_bg      = min(Acceptor);
+        end
+        
         trace.Donor_hmm(1,x)        = NaN;
         trace.Acceptor_hmm(1,x)     = NaN;
         
-        trace.Donor_bg(1)           = 0;
-        trace.Acceptor_bg(1)        = 0;
-        
-        trace.Donor(1,x)           = Donor;
-        trace.Acceptor(1,x)        = Acceptor;
+        trace.Donor(1,x)           = Donor - trace.Donor_bg;
+        trace.Acceptor(1,x)        = Acceptor - trace.Acceptor_bg;
     end
     
     % FRET
@@ -1179,24 +1210,29 @@ function trace = calculateTraceData(trace, movMeanWidth, x, minStates,...
 end
 
 %% DAScale
-function setScale(hObject,lowvalue,highvalue)
-    handles = guidata(hObject);
-    ax = axis(handles.tra.DAAxes); 
-    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
-    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
-    
-    highscalefix = 11-log10(1.1); % ensures max highvalue gives a scale of 1.1
-    highscale = 10^-(highscalefix-highvalue);
-    lowscale = ((lowvalue-1)*highscale/10);
-    
-    axis(handles.tra.DAAxes,[startT, endT, lowscale, highscale]);
-end
+% function setScale(hObject,lowvalue,highvalue)
+%     handles = guidata(hObject);
+%     traces = getappdata(handles.f,'traces');
+%     c = getappdata(handles.f,'trace_currentTrace');
+%     
+%     startT = traces.LowCut(c);
+%     endT = traces.HighCut(c);
+%     
+%     highscalefix = 11-log10(1.1); % ensures max highvalue gives a scale of 1.1
+%     highscale = 10^-(highscalefix-highvalue);
+%     lowscale = ((lowvalue-1)*highscale/10);
+%     
+%     axis(handles.tra.DAAxes,[startT, endT, lowscale, highscale]);
+% end
 
 %% Settings
+
+% Cut
+
 function setCut(hObject)
     handles = guidata(hObject);
-    handles.tra.preCalButton.Enable = 'on';
     traces = getappdata(handles.f,'traces');
+    c = getappdata(handles.f,'trace_currentTrace');
     
     low = handles.tra.cutSlider.JavaPeer.get('LowValue');
     high = handles.tra.cutSlider.JavaPeer.get('HighValue');
@@ -1206,7 +1242,9 @@ function setCut(hObject)
     ax = axis(handles.tra.DAAxes);
     axis(handles.tra.DAAxes, [low, high, ax(3), ax(4)]);
     
-    traces.Calculated  = zeros(size(traces,1),1,'logical');
+    traces.LowCut(c) = low;
+    traces.HighCut(c) = high;
+    traces.Calculated(c) = false;
     
     donorLimits = stretchlim(traces.Donor_raw(:,low:high));
     acceptorLimits = stretchlim(traces.Acceptor_raw(:,low:high));
@@ -1224,8 +1262,8 @@ end
 
 function setHighCut(hObject)
     handles = guidata(hObject);
-    handles.tra.preCalButton.Enable = 'on';
     traces = getappdata(handles.f,'traces');
+    c = getappdata(handles.f,'trace_currentTrace');
     
     high = str2double(handles.tra.highCutTextBox.String);
     low = handles.tra.cutSlider.JavaPeer.get('LowValue');
@@ -1238,7 +1276,8 @@ function setHighCut(hObject)
     ax = axis(handles.tra.DAAxes);
     axis(handles.tra.DAAxes, [low, high, ax(3), ax(4)]);
     
-    traces.Calculated  = zeros(size(traces,1),1,'logical');
+    traces.HighCut(c) = high;
+    traces.Calculated(c) = false;
     
     donorLimits = stretchlim(traces.Donor_raw(:,low:high));
     acceptorLimits = stretchlim(traces.Acceptor_raw(:,low:high));
@@ -1252,8 +1291,8 @@ end
 
 function setLowCut(hObject)
     handles = guidata(hObject);
-    handles.tra.preCalButton.Enable = 'on';
     traces = getappdata(handles.f,'traces');
+    c = getappdata(handles.f,'trace_currentTrace');
     
     low = str2double(handles.tra.lowCutTextBox.String);
     high = handles.tra.cutSlider.JavaPeer.get('HighValue');
@@ -1265,7 +1304,8 @@ function setLowCut(hObject)
     ax = axis(handles.tra.DAAxes);
     axis(handles.tra.DAAxes, [low, high, ax(3), ax(4)]);
     
-    traces.Calculated  = zeros(size(traces,1),1,'logical');
+    traces.LowCut(c) = low;
+    traces.Calculated(c) = false;
     
     donorLimits = stretchlim(traces.Donor_raw(:,low:high));
     acceptorLimits = stretchlim(traces.Acceptor_raw(:,low:high));
@@ -1277,10 +1317,28 @@ function setLowCut(hObject)
     updateDisplay(hObject,handles);
 end
 
-function setMean_Textbox(hObject)
+function setAllCut(hObject)
     handles = guidata(hObject);
     handles.tra.preCalButton.Enable = 'on';
     traces = getappdata(handles.f,'traces');
+    
+    low = handles.tra.cutSlider.JavaPeer.get('LowValue');
+    high = handles.tra.cutSlider.JavaPeer.get('HighValue');
+    
+    traces.Calculated  = zeros(size(traces,1),1,'logical');
+    traces.LowCut      = low * ones(size(traces,1),1);
+    traces.HighCut     = high * ones(size(traces,1),1);
+    
+    setappdata(handles.f,'traces',traces); % save first
+    updateDisplay(hObject,handles);
+end
+
+% Mean
+
+function setMean_Textbox(hObject)
+    handles = guidata(hObject);
+    traces = getappdata(handles.f,'traces');
+    c = getappdata(handles.f,'trace_currentTrace');
     
     value_min = handles.tra.meanSlider.JavaPeer.get('Minimum');
     value_max = handles.tra.meanSlider.JavaPeer.get('Maximum');
@@ -1291,20 +1349,83 @@ function setMean_Textbox(hObject)
     handles.tra.meanSlider.JavaPeer.set('Value',value);
     handles.tra.meanTextBox.String = num2str(value);
     
-    traces.Calculated  = zeros(size(traces,1),1,'logical');
+    traces.MovingMeanWidth(c) = value;
+    traces.Calculated(c) = false;
+    
     setappdata(handles.f,'traces',traces); % save first
     updateDisplay(hObject,handles);
 end
 
 function setMean_Slider(hObject)
     handles = guidata(hObject);
-    handles.tra.preCalButton.Enable = 'on';
     traces = getappdata(handles.f,'traces');
+    c = getappdata(handles.f,'trace_currentTrace');
     
     value     = handles.tra.meanSlider.JavaPeer.get('Value');
     handles.tra.meanTextBox.String = num2str(value);
     
-    traces.Calculated  = zeros(size(traces,1),1,'logical');
+    traces.MovingMeanWidth(c) = value;
+    traces.Calculated(c) = false;
+    
+    setappdata(handles.f,'traces',traces); % save first
+    updateDisplay(hObject,handles);
+end
+
+function setAllMean(hObject)
+    handles = guidata(hObject);
+    handles.tra.preCalButton.Enable = 'on';
+    traces = getappdata(handles.f,'traces');
+    
+    value = handles.tra.meanSlider.JavaPeer.get('Value');
+    
+    traces.Calculated       = zeros(size(traces,1),1,'logical');
+    traces.MovingMeanWidth  = value * ones(size(traces,1),1);
+    
+    setappdata(handles.f,'traces',traces); % save first
+    updateDisplay(hObject,handles);
+end
+
+% Background
+function setDonorBG(hObject,handles)
+    traces = getappdata(handles.f,'traces');
+    c = getappdata(handles.f,'trace_currentTrace');
+    
+    traces.Donor_bg(c) = str2double(handles.tra.setDonorBGTextBox.String);
+    traces.Calculated(c) = false;
+    
+    setappdata(handles.f,'traces',traces); % save first
+    updateDisplay(hObject,handles);
+end
+
+function setAcceptorBG(hObject,handles)
+    traces = getappdata(handles.f,'traces');
+    c = getappdata(handles.f,'trace_currentTrace');
+    
+    traces.Acceptor_bg(c) = str2double(handles.tra.setAcceptorBGTextBox.String);
+    traces.Calculated(c) = false;
+    
+    setappdata(handles.f,'traces',traces); % save first
+    updateDisplay(hObject,handles);
+end
+
+function autoBG(hObject,handles)
+    traces = getappdata(handles.f,'traces');
+    c = getappdata(handles.f,'trace_currentTrace');
+
+    traces.Donor_bg(c) = NaN;
+    traces.Acceptor_bg(c) = NaN;
+    traces.Calculated(c) = false;
+    
+    setappdata(handles.f,'traces',traces); % save first
+    updateDisplay(hObject,handles);
+end
+
+function allAutoBG(hObject,handles)
+    traces = getappdata(handles.f,'traces');
+
+    traces.Donor_bg     = nan(size(traces,1),1);
+    traces.Acceptor_bg  = nan(size(traces,1),1);
+    traces.Calculated   = zeros(size(traces,1),1,'logical');
     
     setappdata(handles.f,'traces',traces); % save first
     updateDisplay(hObject,handles);
@@ -1331,6 +1452,24 @@ end
 
 function setHMMStates_Slider(hObject)
     handles = guidata(hObject);
+    traces = getappdata(handles.f,'traces');
+    c = getappdata(handles.f,'trace_currentTrace');
+        
+    low = handles.tra.hmmStatesSlider.JavaPeer.get('LowValue');
+    high = handles.tra.hmmStatesSlider.JavaPeer.get('HighValue');
+    handles.tra.hmmStatesLowTextBox.String = num2str(low);
+    handles.tra.hmmStatesHighTextBox.String = num2str(high);
+    
+    traces.MinHMM(c)        = low;
+    traces.MaxHMM(c)        = high;
+    traces.Calculated(c)    = false;
+    
+    setappdata(handles.f,'traces',traces); % save first
+    updateDisplay(hObject,handles);
+end
+
+function setAllHMM(hObject)
+    handles = guidata(hObject);
     handles.tra.preCalButton.Enable = 'on';
     traces = getappdata(handles.f,'traces');
         
@@ -1339,7 +1478,10 @@ function setHMMStates_Slider(hObject)
     handles.tra.hmmStatesLowTextBox.String = num2str(low);
     handles.tra.hmmStatesHighTextBox.String = num2str(high);
     
-    traces.Calculated  = zeros(size(traces,1),1,'logical');
+    traces.MinHMM       = low * ones(size(traces,1),1);
+    traces.MaxHMM       = high * ones (size(traces,1),1);
+    traces.Calculated   = zeros(size(traces,1),1,'logical');
+    
     setappdata(handles.f,'traces',traces); % save first
     updateDisplay(hObject,handles);
 end

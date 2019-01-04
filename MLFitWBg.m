@@ -23,7 +23,7 @@ function [ux, uy, s, A, B, R] = MLFitWBg(data,X,Y)
     
         fitData = A * exp(sXY/(-2*s)) / (2*pi*s) + B;
 
-        R = sum(abs(data - fitData),[1 2]);
+        R = sum(abs(data - fitData),'all');
         
     end
     

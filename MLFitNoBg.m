@@ -1,5 +1,5 @@
 function [ux, uy] = MLFitNoBg(data,X,Y)
-    numT    = size(data(:),1);
+    numT    = numel(data);
     dataT   = sum(data(:));
 
     ux  = mean(data(:).*X(:))/dataT*numT;

@@ -147,8 +147,8 @@ function cancelFlag = saveSession(hObject, autoSaveFlag)
             session.tra_lowStates       = get(handles.tra.hmmStatesSlider.JavaPeer, 'LowValue');
             session.tra_highStates     	= get(handles.tra.hmmStatesSlider.JavaPeer, 'HighValue');
             
-            session.tra_DAScaleAuto     = handles.tra.DAScaleAuto.Value;
-            session.tra_DAScale         = [get(handles.tra.DAScale.JavaPeer, 'LowValue'), get(handles.tra.DAScale.JavaPeer, 'HighValue')];
+%             session.tra_DAScaleAuto     = handles.tra.DAScaleAuto.Value;
+%             session.tra_DAScale         = [get(handles.tra.DAScale.JavaPeer, 'LowValue'), get(handles.tra.DAScale.JavaPeer, 'HighValue')];
             
             session.tra_donorBGRule     = getappdata(handles.f,'trace_donorBGRule');
             session.tra_acceptorBGRule  = getappdata(handles.f,'trace_acceptorBGRule');

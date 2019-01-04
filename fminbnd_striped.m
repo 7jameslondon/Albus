@@ -4,7 +4,7 @@ function [xf,fval,exitflag] = fminbnd_striped(funfcn, ax,bx)
     % 0 - maxfun or maxiter
     % 1 - okay
 
-    tol = 1;
+    tol = 1; % assumes input is uint
     maxfun = 100;
     maxiter = 100;
 
@@ -19,7 +19,7 @@ function [xf,fval,exitflag] = fminbnd_striped(funfcn, ax,bx)
     seps = sqrt(eps);
     c = 0.5*(3.0 - sqrt(5.0));
     a = ax; b = bx;
-    v = a; % inital guess (old: a + c*(b-a))
+    v = ax;%a + c*(b-a);
     w = v; xf = v;
     d = 0.0; e = 0.0;
     x= xf; fx = funfcn(x);

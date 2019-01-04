@@ -15,31 +15,35 @@ function generateFRETTraces(hObject, handles)
     
     I = generateFRETInterface('getCurrentImage',hObject,handles,1); % 1 stops brightness setting being applied
     
-    filterSize = handles.fret.particleFilter.JavaPeer.get('Value') / handles.fret.particleFilter.JavaPeer.get('Maximum') * 5;
     particleMinInt = handles.fret.particleIntensity.JavaPeer.get('LowValue');
     particleMaxInt = handles.fret.particleIntensity.JavaPeer.get('HighValue');
-    particleMaxEccentricity = handles.fret.eccentricitySlider.JavaPeer.get('Value')...
-        / handles.fret.eccentricitySlider.JavaPeer.get('Maximum');
-    particleMinDistance = handles.fret.minDistanceSlider.JavaPeer.get('Value')...
-        / handles.fret.minDistanceSlider.JavaPeer.get('Maximum') * 20;
     combinedROIMask = getappdata(handles.f,'combinedROIMask');
-    edgeDistance = handles.fret.edgeDistanceSlider.JavaPeer.get('Value')...
-        / handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum') * 20;
-    startT = handles.tra.cutSlider.JavaPeer.get('LowValue');
-    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
-    
     width = handles.fret.widthSlider.JavaPeer.get('Value')/2;
+    particleClustering = handles.fret.clusterCheckBox.Value;
     
     %% Find particles
-    particles = findParticles(I, particleMinInt, particleMaxInt, filterSize,...
-                                'Method','GaussianFit',...
-                                'EdgeDistance', edgeDistance,...
-                                'Mask', combinedROIMask,...
-                                'MaxEccentricity', particleMaxEccentricity,...
-                                'MinDistance', particleMinDistance);
-    traces = particles{1};    
+                            
+    if particleClustering
+        particleMaxEccentricity = handles.fret.eccentricitySlider.JavaPeer.get('Value') / handles.fret.eccentricitySlider.JavaPeer.get('Maximum');
+        particleMinDistance = handles.fret.minDistanceSlider.JavaPeer.get('Value') / handles.fret.minDistanceSlider.JavaPeer.get('Maximum') * 20;
+        edgeDistance = handles.fret.edgeDistanceSlider.JavaPeer.get('Value') / handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum') * 20;
+        
+        particles = findParticles(I, particleMinInt, particleMaxInt,...
+                                    'EdgeDistance', edgeDistance,...
+                                    'Mask', combinedROIMask,...
+                                    'MaxEccentricity',particleMaxEccentricity,...
+                                    'MinDistance', particleMinDistance);
+    else
+        particles = findParticles(I_raw, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
+    end
+                            
+                            
+    traces = array2table(particles{1});    
     
-    traces.HalfWidth = width/2 * ones(size(traces.HalfWidth));
+    traces.Center = [traces.Var1, traces.Var2];
+    traces.Var1 = [];
+    traces.Var2 = [];
+    traces.HalfWidth = width/2 * ones(size(traces,1),1);
     
     %% Calculate the donor and acceptor raw traces
     numTraces = size(traces,1);
@@ -49,8 +53,8 @@ function generateFRETTraces(hObject, handles)
         waitbar(f/dur);
                 
         if numStacks == 2
-            I_donor    = im2double(seperatedStacks{1}(:,:,f));
-            I_acceptor = im2double(seperatedStacks{2}(:,:,f));
+            I_donor    = double(seperatedStacks{1}(:,:,f));
+            I_acceptor = double(seperatedStacks{2}(:,:,f));
 
             %% interperolate at maskpoints
             F_donor    = griddedInterpolant(I_donor);
@@ -71,7 +75,7 @@ function generateFRETTraces(hObject, handles)
             Acceptor_raw(:,f)  	= mean((reshape( F_acceptor(F_x,F_y), [], 49 ) ) .* W ,2);
             
         elseif numStacks == 1
-            I_donor    = im2double(seperatedStacks(:,:,f));
+            I_donor    = double(seperatedStacks(:,:,f));
 
             %% interperolate at maskpoints
             F_donor    = griddedInterpolant(I_donor);
@@ -182,6 +186,11 @@ function generateFRETTraces(hObject, handles)
     traces.Acceptor_bg  = zeros(numTraces,1);
     traces.Calculated   = zeros(numTraces,1,'logical');
     traces.Groups       = zeros(numTraces,0,'logical');
+    traces.MinHMM       = ones(numTraces,1);
+    traces.MaxHMM       = ones(numTraces,1);
+    traces.LowCut       = ones(numTraces,1);
+    traces.HighCut      = dur * ones(numTraces,1);
+    traces.MovingMeanWidth = ones(numTraces,1);
         
     setappdata(handles.f,'traces',traces);
     

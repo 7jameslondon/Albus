@@ -55,6 +55,17 @@ function flag = loadSession(hObject)
     if ~isfield(session,'fret_width')
         session.fret_width = 5;
     end
+    if isfield(session,'tra_traces')        
+        if ~any(strcmp('MovingMeanWidth', session.tra_traces.Properties.VariableNames))
+            numTraces = size(session.tra_traces,1);
+            dur = size(session.tra_traces.Donor,2);
+            session.tra_traces.LowCut           = ones(numTraces,1);
+            session.tra_traces.HighCut          = dur * ones(numTraces,1);
+            session.tra_traces.MovingMeanWidth  = ones(numTraces,1);
+            session.tra_traces.MinHMM           = ones(numTraces,1);
+            session.tra_traces.MaxHMM           = ones(numTraces,1);
+        end
+    end
     
     
     %% Setup general variables
