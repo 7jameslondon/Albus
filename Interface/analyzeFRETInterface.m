@@ -659,10 +659,10 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         handles.tra.meanTextBox.set('String', num2str(movMeanWidth));
         
         % HMM Controls
-        handles.tra.hmmStatesLowTextBox.set('String',num2str(traces.MinHMM(c)));
-        handles.tra.hmmStatesSlider.JavaPeer.set('LowValue',traces.MinHMM(c));
-        handles.tra.hmmStatesHighTextBox.set('String',num2str(traces.MaxHMM(c)));
-        handles.tra.hmmStatesSlider.JavaPeer.set('HighValue',traces.MaxHMM(c));
+        handles.tra.hmmStatesLowTextBox.set('String', num2str(traces.MinHMM(c)));
+        handles.tra.hmmStatesSlider.JavaPeer.set('LowValue', traces.MinHMM(c));
+        handles.tra.hmmStatesHighTextBox.set('String', num2str(traces.MaxHMM(c)));
+        handles.tra.hmmStatesSlider.JavaPeer.set('HighValue', traces.MaxHMM(c));
         
         % Frame rate adjustment for all plots
         frameRate = str2double(handles.tra.frameRate.String);
@@ -1199,10 +1199,12 @@ function trace = calculateTraceData(trace, donorScale, acceptorScale)
         noFRETInd                  = (trace.Donor_hmm(1,:)==0 | trace.Acceptor_hmm(1,:)==0);
         trace.FRET(noFRETInd)      = 0; % NaN cant be sent to vbFRET
         trace.FRET_hmm(1,x)        = vbFRETWrapper(trace.FRET(1,x), minStates, maxStates);
-        trace.FRET(noFRETInd)      = NaN; 
-        trace.FRET_hmm(noFRETInd)  = NaN; 
+        trace.FRET_hmm(noFRETInd)  = 0; 
     else 
         trace.FRET_hmm(1,x) = NaN;
+        
+        noFRETInd                  = (trace.Donor(1,:)<=0 | trace.Acceptor(1,:)<=0);
+        trace.FRET(noFRETInd)      = 0; 
     end
     
     % Calculated
