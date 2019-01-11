@@ -250,7 +250,8 @@ function handles = createInterface(handles)
                                                     'HMM Histograms',...
                                                     'Transition Density',...
                                                     'Transition Count',...
-                                                    'Post-sync',...
+                                                    'Post-sync of FRET',...
+                                                    'Post-sync of FRET HMM',...
                                                     'Dwell Times',...
                                                     'Correlation'});
     % exclude zero data                                            
@@ -1511,8 +1512,10 @@ function displayAnalysis(hObject,handles)
             displayTDP(hObject, handles);
         case 'Transition Count'
             uiwait(msgbox('Only for export.'));
-        case 'Post-sync'
-            displayPSH(hObject, handles);
+        case 'Post-sync of FRET'
+            displayPSH(hObject, handles, 0);
+        case 'Post-sync of FRET HMM'
+            displayPSH(hObject, handles, 1);
         case 'Correlation'
             displayCorrelation(hObject, handles);
         case 'Dwell Times'
@@ -1779,7 +1782,7 @@ function displayTDP(hObject, handles)
 end
 
 % Post sync
-function displayPSH(hObject, handles)
+function displayPSH(hObject, handles, HMM)
     %% Setups
     % get all the trace data
     traces = getappdata(handles.f,'traces');
@@ -1791,7 +1794,11 @@ function displayPSH(hObject, handles)
     frameRate = str2double(handles.tra.frameRate.String);
     
     %% Calculation
-    fret  = traces.FRET_hmm(:,T); % grab all the FRET traces in one matrix
+    if HMM
+        fret  = traces.FRET_hmm(:,T); % grab all the FRET traces in one matrix
+    else
+        fret  = traces.FRET(:,T); % grab all the FRET traces in one matrix
+    end
     times = repmat(1:length(T),size(fret,1),1);
     
     if handles.tra.export.excludeZeros.Value
@@ -1803,10 +1810,11 @@ function displayPSH(hObject, handles)
     
     %% Display
     figure;
-    histogram2(times(:),fret(:),1:length(T), 0:.01:1)
+    histogram2(times(:),fret(:),1:length(T), 0:.01:1, 'FaceColor','flat')
     xlabel('Time');
     ylabel('FRET');
     shading interp;
+    colormap jet;
     view(0,90); % birds-eye
     xlim([startT,endT])
     ylim([0,1])
