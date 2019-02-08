@@ -443,6 +443,9 @@ function setWidth(hObject, value)
     value = handles.fret.widthSlider.JavaPeer.get('Value')/2;
     handles.fret.widthTextbox.String = num2str(value);
     
+    handles.tra.widthSlider.JavaPeer.set('Value', value*2);
+    handles.tra.widthTextbox.String = num2str(value);
+    
     updateDisplay(hObject, handles);
 end
 

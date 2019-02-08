@@ -1,4 +1,4 @@
-function generateFRETTraces(hObject, handles)
+function generateFRETTraces(hObject, handles, refresh)
     hWaitBar = waitbar(0,'Generating traces ...', 'WindowStyle', 'modal');
     
     %% Grab relevent data
@@ -13,36 +13,43 @@ function generateFRETTraces(hObject, handles)
         numStacks = 1;
     end
     
-    I = generateFRETInterface('getCurrentImage',hObject,handles,1); % 1 stops brightness setting being applied
+    refresh = exist('refresh','var') && refresh;
     
-    particleMinInt = handles.fret.particleIntensity.JavaPeer.get('LowValue');
-    particleMaxInt = handles.fret.particleIntensity.JavaPeer.get('HighValue');
-    combinedROIMask = getappdata(handles.f,'combinedROIMask');
-    width = handles.fret.widthSlider.JavaPeer.get('Value')/2;
-    particleClustering = handles.fret.clusterCheckBox.Value;
-    
-    %% Find particles
-                            
-    if particleClustering
-        particleMaxEccentricity = handles.fret.eccentricitySlider.JavaPeer.get('Value') / handles.fret.eccentricitySlider.JavaPeer.get('Maximum');
-        particleMinDistance = handles.fret.minDistanceSlider.JavaPeer.get('Value') / handles.fret.minDistanceSlider.JavaPeer.get('Maximum') * 20;
-        edgeDistance = handles.fret.edgeDistanceSlider.JavaPeer.get('Value') / handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum') * 20;
-        
-        particles = findParticles(I, particleMinInt, particleMaxInt,...
-                                    'EdgeDistance', edgeDistance,...
-                                    'Mask', combinedROIMask,...
-                                    'MaxEccentricity',particleMaxEccentricity,...
-                                    'MinDistance', particleMinDistance);
+    if refresh
+        traces = getappdata(handles.f,'traces');
+        width = handles.fret.widthSlider.JavaPeer.get('Value')/2;
     else
-        particles = findParticles(I_raw, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
-    end
-                            
-                            
-    traces = array2table(particles{1});    
+
+        %% Find particles
+        I = generateFRETInterface('getCurrentImage',hObject,handles,1); % 1 stops brightness setting being applied
     
-    traces.Center = [traces.Var1, traces.Var2];
-    traces.Var1 = [];
-    traces.Var2 = [];
+        particleMinInt = handles.fret.particleIntensity.JavaPeer.get('LowValue');
+        particleMaxInt = handles.fret.particleIntensity.JavaPeer.get('HighValue');
+        combinedROIMask = getappdata(handles.f,'combinedROIMask');
+        width = handles.fret.widthSlider.JavaPeer.get('Value')/2;
+        particleClustering = handles.fret.clusterCheckBox.Value;
+                            
+        if particleClustering
+            particleMaxEccentricity = handles.fret.eccentricitySlider.JavaPeer.get('Value') / handles.fret.eccentricitySlider.JavaPeer.get('Maximum');
+            particleMinDistance = handles.fret.minDistanceSlider.JavaPeer.get('Value') / handles.fret.minDistanceSlider.JavaPeer.get('Maximum') * 20;
+            edgeDistance = handles.fret.edgeDistanceSlider.JavaPeer.get('Value') / handles.fret.edgeDistanceSlider.JavaPeer.get('Maximum') * 20;
+
+            particles = findParticles(I, particleMinInt, particleMaxInt,...
+                                        'EdgeDistance', edgeDistance,...
+                                        'Mask', combinedROIMask,...
+                                        'MaxEccentricity',particleMaxEccentricity,...
+                                        'MinDistance', particleMinDistance);
+        else
+            particles = findParticles(I_raw, particleMinInt, particleMaxInt, 'Mask', combinedROIMask);
+        end
+
+
+        traces = array2table(particles{1});    
+
+        traces.Center = [traces.Var1, traces.Var2];
+        traces.Var1 = [];
+        traces.Var2 = [];
+    end
     traces.HalfWidth = width/2 * ones(size(traces,1),1);
     
     %% Calculate the donor and acceptor raw traces
@@ -99,99 +106,35 @@ function generateFRETTraces(hObject, handles)
     end
     traces.Donor_raw = Donor_raw;
     traces.Acceptor_raw = Acceptor_raw;
-    
-    %% Calculate the donor and acceptor centers
-    
-    traces.DADistance = traces.Donor_raw*NaN;
-        
-%     I_height = size(I,1);
-%     I_width = size(I,2);
-%     blankMask = zeros(I_height,I_width);
-%     maxInt = getappdata(handles.f,'video_maxIntensity');
-%     
-%     for t=1:numTraces % no parfor becuase seperatedStacks is too big :(
-%         
-%         if numStacks == 2
-%             minX = max(round(traces.Center(t,2)-width*1.5),1);
-%             maxX = min(round(traces.Center(t,2)+width*1.5),I_width);
-%             minY = max(round(traces.Center(t,1)-width*1.5),1);
-%             maxY = min(round(traces.Center(t,1)+width*1.5),I_width);
-%             mask = blankMask;
-%             mask(minY:maxY,minX:maxX) = 1;
-%             
-%             donorPerFrame    = findParticles(seperatedStacks{1}, 0, maxInt, filterSize,...
-%                                         'Method','Centroid',...
-%                                         'Mask', mask);
-%             acceptorPerFrame = findParticles(seperatedStacks{2}, 0, maxInt, filterSize,...
-%                                         'Method','Centroid',...
-%                                         'Mask', mask);
-%                                     
-%             Donor_centersX = ones(1,dur)*NaN;
-%             Donor_centersY = ones(1,dur)*NaN;
-%             Acceptor_centersX = ones(1,dur)*NaN;
-%             Acceptor_centersY = ones(1,dur)*NaN;
-%     
-%             for f=1:dur
-%                 % donor
-%                 donors = donorPerFrame{f} - traces.Center(t,:);
-%                 if size(donors,1) == 1
-%                     
-%                     Donor_centersX(f) = donors(1,1);
-%                     Donor_centersY(f) = donors(1,2);
-%                     
-%                 elseif size(donors,1) > 1
-%                     
-%                     distr  = xy2r(donors(:,1), donors(:,2));
-%                     [~, ind] = min(distr);
-%                     
-%                     Donor_centersX(f) = donors(ind,1);
-%                     Donor_centersY(f) = donors(ind,2);
-%                     
-%                 end
-%                 
-%                 % acceptor
-%                 acceptors = acceptorPerFrame{f} - traces.Center(t,:);
-%                 if size(acceptors,1) == 1
-%                     Acceptor_centersX(f) = acceptors(1,1);
-%                     Acceptor_centersY(f) = acceptors(1,2);
-%                     
-%                 elseif size(acceptors,1) > 1
-%                     
-%                     distr  = xy2r(acceptors(:,1), acceptors(:,2));
-%                     [~, ind] = min(distr);
-%                     
-%                     Acceptor_centersX(f) = acceptors(ind,1);
-%                     Acceptor_centersY(f) = acceptors(ind,2);
-%                 end
-%             end
-%         elseif numStacks == 1
-%             
-%         end
-%         
-%         traces(t,:).DADistance = xy2r(Donor_centersX - Acceptor_centersX, Donor_centersY - Acceptor_centersY);
-%         
-%         waitbar(t/numTraces);
-%         
-%     end
-    
+
     % pre-alocs
     preAloc = zeros(numTraces, dur);
-    traces.Donor        = preAloc;
-    traces.Donor_hmm    = preAloc;
-    traces.Acceptor     = preAloc;
-    traces.Acceptor_hmm = preAloc;
-    traces.FRET         = preAloc;
-    traces.FRET_hmm     = preAloc;
-    traces.Donor_bg     = zeros(numTraces,1);
-    traces.Acceptor_bg  = zeros(numTraces,1);
-    traces.Calculated   = zeros(numTraces,1,'logical');
-    traces.Groups       = zeros(numTraces,0,'logical');
-    traces.MinHMM       = ones(numTraces,1);
-    traces.MaxHMM       = ones(numTraces,1);
-    traces.LowCut       = ones(numTraces,1);
-    traces.HighCut      = dur * ones(numTraces,1);
-    traces.MovingMeanWidth = ones(numTraces,1);
-        
+    if ~refresh
+        traces.Donor        = preAloc;
+        traces.Donor_hmm    = preAloc;
+        traces.Acceptor     = preAloc;
+        traces.Acceptor_hmm = preAloc;
+        traces.FRET         = preAloc;
+        traces.FRET_hmm     = preAloc;
+        traces.Donor_bg     = zeros(numTraces,1);
+        traces.Acceptor_bg  = zeros(numTraces,1);
+        traces.Calculated   = zeros(numTraces,1,'logical');
+        traces.Groups       = zeros(numTraces,0,'logical');
+        traces.MinHMM       = ones(numTraces,1);
+        traces.MaxHMM       = ones(numTraces,1);
+        traces.LowCut       = ones(numTraces,1);
+        traces.HighCut      = dur * ones(numTraces,1);
+        traces.MovingMeanWidth = ones(numTraces,1);
+    else
+        traces.Donor        = preAloc;
+        traces.Donor_hmm    = preAloc;
+        traces.Acceptor     = preAloc;
+        traces.Acceptor_hmm = preAloc;
+        traces.FRET         = preAloc;
+        traces.FRET_hmm     = preAloc;
+        traces.Calculated   = zeros(numTraces,1,'logical');
+    end
+
     setappdata(handles.f,'traces',traces);
     
     donorLimits = stretchlim(traces.Donor_raw,[0.1,0.90]);

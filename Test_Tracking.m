@@ -9,19 +9,23 @@ filePath = ['/Users/jameslondon/Documents/Fishel Lab/JL Nature Data/2016-',...
             'L 1_300ms_1/MutS+MutL 1_300ms_1_MMStack_Pos0.',...
             'ome.tif'];
 [stack, maxIntensity] = getStackFromFile(filePath);
-S = stack(48:48+13,323:323+21,1:300);
+S = stack(48:48+13,323:323+21,1:100);
+%S = stack(1:200,323:end,1:100);
 
-f = figure(1);
+fig = figure(1);
 imshow(imadjust(imcomplement(S(:,:,1))));
 %%
-
+tic;
 minJ        = 14000;
 logWidth    = 0.35;
-boundRadius = 4;
+boundRadius = 3;
 
 positions = cell(size(S,3),1);
+
+parWaitbar('start', 'Detecting', size(S,3));
 for f = 1:size(S,3)
-    particles = MLDetector(S(:,:,f), minJ,logWidth,boundRadius,'MLE Center Only');
+    parWaitbar;
+    particles = MLDetector(S(:,:,f), minJ,logWidth,boundRadius,'MLE Hill');
     if ~isempty(particles)
         positions{f} = [[particles.x]', [particles.y]'];
     end
@@ -30,11 +34,24 @@ for f = 1:size(S,3)
 %     plot(positions{f}(:,1),positions{f}(:,2),'.r');
 %     hold off;
 end
+toc
+parWaitbar('done');
 
 
+%%
+minJ        = 10000;
+logWidth    = 0.35;
+boundRadius = 3;
 
-
-
+positions = cell(size(S,3),1);
+f = 9;
+particles = MLDetector(S(:,:,f), minJ, logWidth, boundRadius, 'WLS');
+fig = figure(1);
+ax = axes;
+im = imshow(imadjust(imcomplement(S(:,:,f))));
+hold on;
+viscircles(ax,[[particles.x]',[particles.y]'],[particles.s]'/2);
+hold off;
 
 
 %% Tri Track
@@ -83,24 +100,25 @@ end
 
 
 
+%% NN Track
+maxLRMovment = 3;
+maxUDMovment = 1.5;
+tracks = nearestDNANeighborTracking( positions, maxLRMovment, maxUDMovment );
 
 %% GGNN Track
+tic;
 maxLRMovment = 5;
 maxUDMovment = 2;
-tracks = GNNTracking( positions, maxLRMovment, maxUDMovment );
-
-
-%% NN Track
-maxLRMovment = 5;
-maxUDMovment = 2;
-tracks = nearestDNANeighborTracking( positions, maxLRMovment, maxUDMovment );
+maxBlink = 2;
+tracks = GNNTracking( positions, maxLRMovment, maxUDMovment, maxBlink );
+toc
 
 %% NN Plot
 imshow(imadjust(imcomplement(timeAvgStack(S))));
 hold on;
 for i=1:size([tracks.positions],2)
     pos = tracks(i).positions.centers;
-    if size(pos,1) > 10 && abs(min(pos(:,2)) - max(pos(:,2))) > 0
+    if size(pos,1) > 1 && abs(min(pos(:,2)) - max(pos(:,2))) > 0
         
         plot(pos(:,1),pos(:,2),'.-');
     end
@@ -108,13 +126,13 @@ end
 hold off;
 
 %% NN Track Movie
-f = figure(5)
-ax = axes(f);
+fig = figure(5);
+ax = axes(fig);
 im = imshow(imadjust(imcomplement(S(:,:,1))),'Parent',ax);
 
 rgb=rand(size([tracks.positions],2),3);
 
-h = imscrollpanel(f, im);
+h = imscrollpanel(fig, im);
 api = iptgetapi(h);
 api.setMagnification(api.findFitMag())
 
@@ -122,14 +140,21 @@ for f=1:size(S,3)
     im = imshow(imadjust(imcomplement(S(:,:,f))),'Parent',ax);
     
     hold on;
+    
+    if ~isempty(positions{f})
+        plot(positions{f}(:,1),positions{f}(:,2),'or');
+    end
+    
     for i=1:size([tracks.positions],2)
         if tracks(i).positions.frames(1) <= f && tracks(i).positions.frames(end) >= f
             pos = tracks(i).positions.centers;
-            plot(pos(1:f-tracks(i).positions.frames(1)+1,1),pos(1:f-tracks(i).positions.frames(1)+1,2),'.-','Color',rgb(i,:));
+            plot(pos(tracks(i).positions.frames <= f,1), pos(tracks(i).positions.frames <= f,2),'.-','Color',rgb(i,:));
         end
     end
+    
     hold off;
-    drawnow;
+    
+    pause(.5);
 end
 
 

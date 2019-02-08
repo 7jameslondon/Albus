@@ -31,6 +31,29 @@ function handles = createInterface(handles)
                                            'Padding',5);
     handles.tra.settingsBox = uix.VBox('Parent', handles.tra.settingsPanel);
     
+    %% width
+    % box
+    handles.tra.WidthBox = uix.HBox('Parent', handles.tra.settingsBox);
+    % text
+    uicontrol( 'Parent', handles.tra.WidthBox,...
+               'Style' , 'text', ...
+               'String', 'Gaussina Width');
+    % textbox
+    handles.tra.widthTextbox = uicontrol(   'Parent', handles.tra.WidthBox,...
+                                                    'Style' , 'edit', ...
+                                                    'String', '5',...
+                                                    'Callback', @(hObject,~) setWidth(hObject,str2double(hObject.String)));
+                                                
+    % slider
+    [~, handles.tra.widthSlider] = javacomponent('javax.swing.JSlider');
+    handles.tra.widthSlider.set('Parent', handles.tra.WidthBox);
+    handles.tra.widthSlider.JavaPeer.set('Maximum', 18);
+    handles.tra.widthSlider.JavaPeer.set('Minimum', 0.5);
+    handles.tra.widthSlider.JavaPeer.set('Value', 10);
+    handles.tra.widthSlider.JavaPeer.set('MouseReleasedCallback', @(~,~) setWidth(handles.tra.widthSlider, handles.tra.widthSlider.JavaPeer.get('Value')/2));
+    
+    handles.fret.WidthBox.set('Widths',[100 50 -1]);
+    
     % pre-calculate all
     handles.tra.preCalButton = uicontrol(   'Parent', handles.tra.settingsBox,...
                                             'String', 'Pre-calculate',...
@@ -123,7 +146,7 @@ function handles = createInterface(handles)
                                             'Style', 'edit',...
                                             'Callback', @(hObject,~) updateDisplay(hObject,guidata(hObject)));
                                             
-    handles.tra.settingsBox.set('Heights',[25,20,20,20,20,20,20,30,25]);
+    handles.tra.settingsBox.set('Heights',[25,25,20,20,20,20,20,20,30,25]);
                                     
     %% selection
     handles.tra.selectionPanel = uix.BoxPanel(  'Parent', handles.tra.leftPanel,...
@@ -696,8 +719,11 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         axis(handles.tra.FRETAxes, [startT, endT, -0.05, 1.05]);
         
         % Centers
+        %if ~isfield(traces,'DADistance')
+        %    generateFRETTraces(hObject, handles, true);
+        %end
         cor = FRETCorr(traces.Donor(c,x), traces.Acceptor(c,x));
-        handles.tra.ColocalizationPlot.XData    = 1:size(cor,2);
+        handles.tra.ColocalizationPlot.XData    = 1:size(cor,2); % x;
         handles.tra.ColocalizationPlot.YData    = cor; % traces.DADistance(c,x);
         axis(handles.tra.PosAxes,'auto');
         
@@ -712,21 +738,6 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         mag = handles.tra.vidAxesAPI.getMagnification();
         handles.tra.vidAxesAPI.setMagnificationAndCenter(mag,traces.Center(c,1),traces.Center(c,2)); % center video scroll on current peak
                 
-        %% Auto scale axes if applicable
-%         if handles.tra.DAScaleAuto.Value
-%             lowDAV = min([traces.Donor(c,x), traces.Acceptor(c,x)])  * 0.9;
-%             highDAV = max([traces.Donor(c,x), traces.Acceptor(c,x)]) * 1.1;
-%             
-%             highscalefix = 11-log10(1.1); % ensures max highvalue gives a scale of 1.1
-%             highDA = log10(highDAV)+highscalefix;
-%             lowDA  = (lowDAV*10/highDAV)+1;
-%             
-%             handles.tra.DAScale.JavaPeer.set('LowValue',lowDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11);
-%             handles.tra.DAScale.JavaPeer.set('HighValue',highDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11);
-%             handles.tra.DAScale.JavaPeer.set('LowValue',lowDA * handles.tra.DAScale.JavaPeer.get('Maximum')/11); % do it twise incase high is initaly lower
-%             
-%             setScale(hObject,lowDA,highDA);
-%         end
         axis(handles.tra.DAAxes,'auto');
         ax = axis(handles.tra.DAAxes);
         axis(handles.tra.DAAxes, [startT, endT, ax(3), ax(4)]);
@@ -1212,26 +1223,25 @@ function trace = calculateTraceData(trace, donorScale, acceptorScale)
     trace.Calculated(1) = true;
 end
 
-%% DAScale
-% function setScale(hObject,lowvalue,highvalue)
-%     handles = guidata(hObject);
-%     traces = getappdata(handles.f,'traces');
-%     c = getappdata(handles.f,'trace_currentTrace');
-%     
-%     startT = traces.LowCut(c);
-%     endT = traces.HighCut(c);
-%     
-%     highscalefix = 11-log10(1.1); % ensures max highvalue gives a scale of 1.1
-%     highscale = 10^-(highscalefix-highvalue);
-%     lowscale = ((lowvalue-1)*highscale/10);
-%     
-%     axis(handles.tra.DAAxes,[startT, endT, lowscale, highscale]);
-% end
-
 %% Settings
 
-% Cut
+% Width
+function setWidth(hObject, value)
+    handles = guidata(hObject);
+    
+    handles.tra.widthSlider.JavaPeer.set('Value', value*2);
+    value = handles.tra.widthSlider.JavaPeer.get('Value')/2;
+    handles.tra.widthTextbox.String = num2str(value);
+    
+    handles.fret.widthSlider.JavaPeer.set('Value', value*2);
+    handles.fret.widthTextbox.String = num2str(value);
+    
+    generateFRETTraces(hObject, handles, true); % true to calcualate from existing centers and keep user settings
+    
+    updateDisplay(hObject, handles);
+end
 
+% Cut
 function setCut(hObject)
     handles = guidata(hObject);
     traces = getappdata(handles.f,'traces');
@@ -1816,7 +1826,7 @@ function displayPSH(hObject, handles, HMM)
     shading interp;
     colormap jet;
     view(0,90); % birds-eye
-    xlim([startT,endT])
+    xlim([1,length(T)])
     ylim([0,1])
 end
 

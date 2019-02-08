@@ -352,9 +352,9 @@ function afineAdjust(hObject,handles,direction)
         case 'down'
             DF{2}(:,:,2) = DF{2}(:,:,2) - 1;
         case 'left'
-            DF{2}(:,:,1) = DF{2}(:,:,1) + 1;
+            DF{2}(:,:,1) = DF{2}(:,:,2) + 1;
         case 'right'
-            DF{2}(:,:,1) = DF{2}(:,:,1) - 1;
+            DF{2}(:,:,2) = DF{2}(:,:,2) - 1;
     end
     setappdata(handles.f,'displacmentFields',DF);
     handles = guidata(handles.f);
