@@ -331,8 +331,6 @@ function handles = loadFromSession(hObject,handles,session)
     handles.fret.widthSlider.JavaPeer.set('Value', session.fret_width*2);
     handles.fret.widthTextbox.String = num2str(session.fret_width);
     
-    handles.tra.widthSlider.JavaPeer.set('Value', session.fret_width*2);
-    handles.tra.widthTextbox.String = num2str(session.fret_width);
     
     switchMode(hObject, handles, session.fret_mode);
 end

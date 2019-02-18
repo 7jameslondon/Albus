@@ -709,16 +709,14 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
         handles.tra.AcceptorStatePlot.YData = traces.Acceptor_hmm(c,x);
         
         ax = axis(handles.tra.DAAxes);
-        startM = handles.tra.cutSlider.JavaPeer.get('Minimum');
-        endM = handles.tra.cutSlider.JavaPeer.get('Maximum');
-        axis(handles.tra.DAAxes, [startM, endM, ax(3), ax(4)]);
+        axis(handles.tra.DAAxes, [startT, endT, ax(3), ax(4)]);
 
         % FRET Trace
         handles.tra.FRETPlot.XData          = x;
         handles.tra.FRETPlot.YData          = traces.FRET(c,x);
         handles.tra.FRETStatePlot.XData     = x;
         handles.tra.FRETStatePlot.YData     = traces.FRET_hmm(c,x);
-        axis(handles.tra.FRETAxes, [startM, endM, -0.05, 1.05]);
+        axis(handles.tra.FRETAxes, [startT, endT, -0.05, 1.05]);
         
         % Centers
         %if ~isfield(traces,'DADistance')
@@ -742,7 +740,7 @@ function updateDisplay(hObject,handles,videoOnlyFlag)
                 
         axis(handles.tra.DAAxes,'auto');
         ax = axis(handles.tra.DAAxes);
-        axis(handles.tra.DAAxes, [startM, endM, ax(3), ax(4)]);
+        axis(handles.tra.DAAxes, [startT, endT, ax(3), ax(4)]);
                 
         %% Update pre-calcualtion button
         if any(~traces(shownTraceIdx,:).Calculated)
@@ -1254,9 +1252,13 @@ function setCut(hObject)
     handles.tra.lowCutTextBox.String = num2str(low);
     handles.tra.highCutTextBox.String = num2str(high);
     
+    ax = axis(handles.tra.DAAxes);
+    axis(handles.tra.DAAxes, [low, high, ax(3), ax(4)]);
+    
     traces.LowCut(c) = low;
     traces.HighCut(c) = high;
     traces.Calculated(c) = false;
+    traces.Donor_
     
     donorLimits = stretchlim(traces.Donor_raw(:,low:high));
     acceptorLimits = stretchlim(traces.Acceptor_raw(:,low:high));
@@ -1284,7 +1286,10 @@ function setHighCut(hObject)
     high = min(high,max_cut);
     handles.tra.cutSlider.JavaPeer.set('HighValue',high);
     handles.tra.highCutTextBox.String = num2str(high);
-        
+    
+    ax = axis(handles.tra.DAAxes);
+    axis(handles.tra.DAAxes, [low, high, ax(3), ax(4)]);
+    
     traces.HighCut(c) = high;
     traces.Calculated(c) = false;
     
@@ -1309,6 +1314,9 @@ function setLowCut(hObject)
     low = max(low,1);
     handles.tra.cutSlider.JavaPeer.set('LowValue',low);
     handles.tra.lowCutTextBox.String = num2str(low);
+    
+    ax = axis(handles.tra.DAAxes);
+    axis(handles.tra.DAAxes, [low, high, ax(3), ax(4)]);
     
     traces.LowCut(c) = low;
     traces.Calculated(c) = false;
@@ -1791,28 +1799,24 @@ function displayPSH(hObject, handles, HMM)
     traces = getappdata(handles.f,'traces');
     shownTraceIdx = getShownTraces(hObject, handles);
     traces = traces(shownTraceIdx,:);
-    startT = handles.tra.cutSlider.JavaPeer.get('Minimum');
-    endT = handles.tra.cutSlider.JavaPeer.get('Maximum');
+    startT = handles.tra.cutSlider.JavaPeer.get('Mini');
+    endT = handles.tra.cutSlider.JavaPeer.get('HighValue');
     T = (startT:endT);
     frameRate = str2double(handles.tra.frameRate.String);
     
     %% Calculation
-    fret = nan(size(traces,1),length(T));
-    
+    fret = nan(size(traces,1),size(T)
     if HMM
         for c = 1:size(traces,1)
             l = traces.LowCut(c);
             h = traces.HighCut(c);
-            s = h-l+1;
-            fret(c,1:s) = traces.FRET_hmm(c,l:h);
+            traces.FRET(c,l:h)
         end
+
+        
+        fret  = traces.FRET_hmm(:,T); % grab all the FRET traces in one matrix
     else
-        for c = 1:size(traces,1)
-            l = traces.LowCut(c);
-            h = traces.HighCut(c);
-            s = h-l+1;
-            fret(c,1:s) = traces.FRET(c,l:h);
-        end
+        fret  = traces.FRET(:,T); % grab all the FRET traces in one matrix
     end
     times = repmat(1:length(T),size(fret,1),1);
     
