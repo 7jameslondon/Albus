@@ -55,7 +55,7 @@ function flag = loadSession(hObject)
     if ~isfield(session,'fret_width')
         session.fret_width = 5;
     end
-    if isfield(session,'tra_traces')        
+    if isfield(session,'tra_traces') && isfield(session.tra_traces, 'Donor')
         if ~any(strcmp('MovingMeanWidth', session.tra_traces.Properties.VariableNames))
             numTraces = size(session.tra_traces,1);
             dur = size(session.tra_traces.Donor,2);
